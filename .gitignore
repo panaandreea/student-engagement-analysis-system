@@ -1,0 +1,19 @@
+# Python & ML 
+**/__pycache__/
+**/.venv/
+**/*.pyc
+**/*.log
+
+# Android 
+**/.gradle/
+**/build/
+**/local.properties
+**/.navigation/
+**/*.iml
+
+# IDEs & System 
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini
+.DS_Store
