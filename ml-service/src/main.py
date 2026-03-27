@@ -29,9 +29,11 @@ for session_index in range(1, NUMBER_OF_SESSIONS + 1):
     display_faces(associate_faces(faces))
 
     # Draw anonymized bounding boxes for reference (only first frame only)
-    if session_index == 1 and frames and faces:
-        draw_bboxes(frames[0], faces[0], FRAMES_DIR)
+    #if session_index == 1 and frames and faces:
+        #draw_bboxes(frames[0], faces[0], FRAMES_DIR)
     # Associate faces across frames
+
+
     student_queues = associate_faces(faces)
     # Extract and export landmarks
     export_facemesh(student_queues, run_dir)

@@ -40,16 +40,18 @@ def display_frames(frames):
         h, w = display_image.shape[:2]
         cv.resizeWindow(window_name, w, h)
 
-        while True:
-            key = cv.waitKey(0)
+        cv.waitKey(2000)
 
-            # Enter key
-            if key in (13, 10):
-                break
 
-            # Quit
-            if key == ord('q'):
-                cv.destroyAllWindows()
-                return
+        # while True:
+        # # Enter key
+        #     key = cv.waitKey(0)
+        #     if key in (13, 10):
+        #         break
+        #
+        #     # Quit
+        #     if key == ord('q'):
+        #         cv.destroyAllWindows()
+        #         return
 
     cv.destroyAllWindows()

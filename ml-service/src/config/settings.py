@@ -9,7 +9,7 @@ MAX_CAMERAS_CHECKED = 3
 # Camera configuration
 CAMERA_ID = 0
 # Number of frames to capture
-NUMBER_OF_FRAMES = 10
+NUMBER_OF_FRAMES = 5
 # Duration (in seconds) over which frames will be captured
 CAPTURE_DURATION = 10
 
@@ -38,9 +38,15 @@ DURATION_BETWEEN_SESSIONS = 30
 
 # ==== OUTPUT DIRECTORIES ====
 # Directory where frames with drawn bounding boxes are saved
-FRAMES_DIR = Path(r"E:\Data\Frames")
+# FRAMES_DIR = Path(r"E:\Data\Frames")
 # Directory where extracted facial landmarks are stored
-LANDMARKS_DIR = Path(r"E:\Data\Landmarks")
+# LANDMARKS_DIR = Path(r"E:\Data\Landmarks")
+
+
+DATA_DIR = PROJECT_ROOT / "data"
+
+FRAMES_DIR = DATA_DIR / "frames"
+LANDMARKS_DIR = DATA_DIR / "landmarks"
 
 
 
