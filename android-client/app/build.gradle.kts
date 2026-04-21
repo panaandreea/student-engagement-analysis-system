@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
 }
@@ -5,6 +7,22 @@ plugins {
 android {
     namespace = "com.student.engagement.system"
     compileSdk = 36
+
+    buildFeatures{
+        buildConfig = true
+    }
+
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+
+    if (localPropertiesFile.exists()){
+        localPropertiesFile.inputStream().use {
+            localProperties.load(it)
+        }
+    }
+
+    val supabaseUrl = localProperties.getProperty("SUPABASE_URL") ?: throw GradleException("SUPABASE_URL missing in local.properties")
+    val supabaseKey = localProperties.getProperty("SUPABASE_KEY") ?: throw GradleException("SUPABASE_KEY missing in local.properties")
 
     defaultConfig {
         applicationId = "com.student.engagement.system"
@@ -14,6 +32,18 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField(
+            "String",
+            "SUPABASE_URL",
+            "\"$supabaseUrl\""
+        )
+
+        buildConfigField(
+            "String",
+            "SUPABASE_KEY",
+            "\"$supabaseKey\""
+        )
     }
 
     buildTypes {
@@ -37,6 +67,17 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
+
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+
+    debugImplementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

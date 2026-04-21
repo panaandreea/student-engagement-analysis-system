@@ -1,52 +1,33 @@
+import os
+
 from pathlib import Path
-
-# ==== CAMERA DISCOVERY ====
-# Maximum camera device index checked in find_available_cameras()
-MAX_CAMERAS_CHECKED = 3
-
+from typing import Dict
 
 # ==== FRAME CAPTURE CONFIGURATION ====
-# Camera configuration
-CAMERA_ID = 0
-# Number of frames to capture
-NUMBER_OF_FRAMES = 5
-# Duration (in seconds) over which frames will be captured
-CAPTURE_DURATION = 10
+CAMERA_ID: int = 0
+NUMBER_OF_FRAMES: int = 20
+CAPTURE_DURATION: float = 10.0
 
 
-# ==== PROJECT PATHS ====
+# ==== PATHS ====
 CURRENT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = CURRENT_DIR.parents[1]
 
 ASSETS_DIR = PROJECT_ROOT / "assets"
 MODELS_DIR = ASSETS_DIR / "models"
 
-YOLO_PATH = MODELS_DIR / "detection" / "yolov12n-face.onnx"
-MOBILE_FACE_NET_PATH = MODELS_DIR / "recognition" / "MobileFaceNet.onnx"
+# ==== MODEL PATHS ====
+FACE_DETECTOR_MODEL_PATH = MODELS_DIR / "detection" / "face-detector-yolo-v12n.onnx"
+ENGAGEMENT_MODEL_PATH = MODELS_DIR / "engagement" / "attention-level-classifier.h5"
 
 
-# Number of worker threads used for parallel face processing
-MAX_WORKER_THREADS = 4
+# ==== THREADING CONFIG ====
+MAX_WORKER_THREADS: int = max(1, (os.cpu_count() or 5) - 1)
 
 
-# ==== SESSION CONFIGURATION ====
-# Number of recording sessions
-NUMBER_OF_SESSIONS = 1
-# Pause duration between sessions
-DURATION_BETWEEN_SESSIONS = 30
-
-
-# ==== OUTPUT DIRECTORIES ====
-# Directory where frames with drawn bounding boxes are saved
-# FRAMES_DIR = Path(r"E:\Data\Frames")
-# Directory where extracted facial landmarks are stored
-# LANDMARKS_DIR = Path(r"E:\Data\Landmarks")
-
-
-DATA_DIR = PROJECT_ROOT / "data"
-
-FRAMES_DIR = DATA_DIR / "frames"
-LANDMARKS_DIR = DATA_DIR / "landmarks"
-
-
-
+# ==== LABEL MAP ====
+ENGAGEMENT_LABEL_MAP: Dict[int, str] = {
+    0: "low",
+    1: "medium",
+    2: "high"
+}

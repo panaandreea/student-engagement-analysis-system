@@ -1,5 +1,5 @@
-## System Requirements
-- Python 3.10.x
+## Requirements
+- Python 3.11.x
 
 ## Setup and Installation
 
@@ -13,10 +13,3 @@ Follow these steps to configure your local environment and start the service:
 
 ### 3. Install Dependencies 
     pip install -r requirements.txt
-
-### 4. Configuration
-Before running the service, you must adjust the storage path (src/config/settings.py):
-- FRAMES_DIR = Path(r"E:\Data\Frames")      
-- LANDMARKS_DIR = Path(r"E:\Data\Landmarks")
-
-

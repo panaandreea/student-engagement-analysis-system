@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_session"
+        android:title="Session"
+        android:icon="@drawable/ic_menu_session" />
+
+    <item
+        android:id="@+id/nav_monitor"
+        android:title="Monitor"
+        android:icon="@drawable/ic_menu_monitor" />
+
+    <item
+        android:id="@+id/nav_history"
+        android:title="History"
+        android:icon="@drawable/ic_menu_history" />
+
+    <item
+        android:id="@+id/nav_profile"
+        android:title="Profile"
+        android:icon="@drawable/ic_menu_profile" />
+</menu>
