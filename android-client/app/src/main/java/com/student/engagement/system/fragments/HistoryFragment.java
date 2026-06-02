@@ -13,30 +13,39 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.student.engagement.system.R;
-import com.student.engagement.system.adapters.SessionAdapter;
+import com.student.engagement.system.adapters.HistorySessionAdapter;
 import com.student.engagement.system.models.response.HistoryResponse;
 import com.student.engagement.system.networking.SupabaseClient;
 import com.student.engagement.system.services.HistoryService;
 import com.student.engagement.system.session.SessionManager;
+import com.student.engagement.system.utils.DateUtils;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
-import java.util.TimeZone;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class HistoryFragment extends Fragment {
+
     private static final String TAG = "HISTORY";
+
     private RecyclerView rvSessions;
-    private SessionAdapter adapter;
+
+    private HistorySessionAdapter adapter;
+
     private final ArrayList<HistoryResponse> statsList = new ArrayList<>();
-    private TextView tvTotalSessionsValue, tvBestSessionValue, tvWorstSessionValue;
-    private TextView tvBestSessionDate, tvWorstSessionDate;
+
+    private TextView tvTotalSessionsValue;
+
+    private TextView tvBestSessionValue;
+
+    private TextView tvWorstSessionValue;
+
+    private TextView tvBestSessionDate;
+
+    private TextView tvWorstSessionDate;
 
     public HistoryFragment() {
         super(R.layout.fragment_history);
@@ -45,7 +54,6 @@ public class HistoryFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        Log.d(TAG, "onViewCreated");
 
         initializeUI(view);
         setupRecyclerView();
@@ -53,7 +61,7 @@ public class HistoryFragment extends Fragment {
     }
 
     private void initializeUI(View view) {
-        rvSessions = view.findViewById(R.id.rvSessions);
+        rvSessions = view.findViewById(R.id.rvHistorySessions);
         tvTotalSessionsValue = view.findViewById(R.id.tvTotalSessionsValue);
         tvBestSessionValue = view.findViewById(R.id.tvBestSessionValue);
         tvWorstSessionValue = view.findViewById(R.id.tvWorstSessionValue);
@@ -62,53 +70,50 @@ public class HistoryFragment extends Fragment {
     }
 
     private void setupRecyclerView() {
-        adapter = new SessionAdapter(statsList, this);
+        adapter = new HistorySessionAdapter(statsList, this);
         rvSessions.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvSessions.setAdapter(adapter);
     }
 
     private void loadHistory() {
         String teacherId = SessionManager.getUserId(requireContext());
-        Log.d(TAG, "Loading history for: " + teacherId);
 
-        if (teacherId == null || teacherId.isEmpty()) {
-            Log.e(TAG, "Teacher ID null!");
-            return;
-        }
+        if (teacherId == null || teacherId.isEmpty()) return;
 
         HistoryService service = SupabaseClient.getInstance(requireContext())
                 .create(HistoryService.class);
 
         service.getStats("eq." + teacherId, "*", "start_time.desc").enqueue(new Callback<List<HistoryResponse>>() {
-            @Override
-            public void onResponse(@NonNull Call<List<HistoryResponse>> call,
-                                   @NonNull Response<List<HistoryResponse>> response) {
 
-                Log.d(TAG, "API response code: " + response.code());
+            @Override
+            public void onResponse(@NonNull Call<List<HistoryResponse>> call, @NonNull Response<List<HistoryResponse>> response) {
+
+                if (!isAdded() || getView() == null) return;
 
                 if (response.isSuccessful() && response.body() != null) {
-                    List<HistoryResponse> data = response.body();
-                    Log.d(TAG, "Data size: " + data.size());
-
-                    updateUIWithData(data);
+                    updateUIWithData(response.body());
                 } else {
-                    Log.e(TAG, "API error: " + response.code());
-                    Toast.makeText(requireContext(), "Failed to load history", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Failed to load history", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<List<HistoryResponse>> call, @NonNull Throwable t) {
+
+                if (!isAdded() || getView() == null) return;
+
                 Log.e(TAG, "Network error", t);
-                Toast.makeText(requireContext(), "Network error", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Network error", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
     private void updateUIWithData(List<HistoryResponse> data) {
-        statsList.clear();
-        statsList.addAll(data);
-        adapter.notifyDataSetChanged();
+        if (!isAdded() || getView() == null) return;
+
+        if (data == null) data = new ArrayList<>();
+
+        adapter.updateData(new ArrayList<>(data));
 
         tvTotalSessionsValue.setText(String.valueOf(data.size()));
 
@@ -123,68 +128,94 @@ public class HistoryFragment extends Fragment {
     }
 
     private void calculateAndPopulateSummary(List<HistoryResponse> stats) {
+        if (!isAdded() || getView() == null) return;
+
         HistoryResponse best = null;
         HistoryResponse worst = null;
 
-        int maxHigh = -1;
-        int maxLow = -1;
+        float maxHighRatio = -1f;
+        float maxLowRatio = -1f;
+
+        boolean hasHigh = false;
+        boolean hasLow = false;
 
         for (HistoryResponse s : stats) {
 
-            if (s.getHigh() > maxHigh) {
-                maxHigh = s.getHigh();
+            if (s == null) continue;
+
+            int low = s.getLow();
+            int medium = s.getMedium();
+            int high = s.getHigh();
+
+            int total = s.getTotalStudents();
+
+            if (total <= 0) continue;
+
+            if (high > 0) hasHigh = true;
+            if (low > 0) hasLow = true;
+
+            float highRatio = (float) high / total;
+            float lowRatio = (float) low / total;
+
+            if (highRatio > maxHighRatio) {
+                maxHighRatio = highRatio;
                 best = s;
             }
 
-            if (s.getLow() > maxLow) {
-                maxLow = s.getLow();
+            if (lowRatio > maxLowRatio) {
+                maxLowRatio = lowRatio;
                 worst = s;
             }
         }
 
-        Log.d(TAG, "Best HIGH = " + maxHigh);
-        Log.d(TAG, "Worst LOW = " + maxLow);
-
-        if (best != null && maxHigh > 0) {
-            tvBestSessionValue.setText(best.getGroupCode());
-            tvBestSessionDate.setText(formatDateForUI(best.getStartTime()));
-        } else {
+        if (!hasHigh || best == null || best.getHigh() == 0) {
             tvBestSessionValue.setText("-");
             tvBestSessionDate.setText("-");
+        } else {
+            tvBestSessionValue.setText(
+                    best.getGroupCode() != null ? best.getGroupCode() : "-"
+            );
+
+            if (best.getStartTime() != null && best.getEndTime() != null) {
+
+                String date = DateUtils.formatIsoToDate(best.getStartTime());
+
+                String start =
+                        DateUtils.formatIsoToTime(best.getStartTime());
+
+                String end =
+                        DateUtils.formatIsoToTime(best.getEndTime());
+
+                tvBestSessionDate.setText(
+                      date + "\n" + start + " - " + end
+                );
+
+            } else {
+                tvBestSessionDate.setText("-");
+            }
+
         }
 
-        if (worst != null && maxLow > 0) {
-            tvWorstSessionValue.setText(worst.getGroupCode());
-            tvWorstSessionDate.setText(formatDateForUI(worst.getStartTime()));
-        } else {
+        if (!hasLow || worst == null || worst.getLow() == 0) {
             tvWorstSessionValue.setText("-");
             tvWorstSessionDate.setText("-");
-        }
-    }
+        } else {
+            tvWorstSessionValue.setText(worst.getGroupCode() != null ? worst.getGroupCode() : "-");
 
-    private String formatDateForUI(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty()) return "-";
+            if (worst.getStartTime() != null && worst.getEndTime() != null) {
 
-        try {
-            String cleanDate = dateStr.replace("T", " ")
-                    .split("\\.")[0]
-                    .split("\\+")[0]
-                    .trim();
+                String date = DateUtils.formatIsoToDate(worst.getStartTime());
 
-            SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
-            parser.setTimeZone(TimeZone.getTimeZone("UTC"));
+                String start = DateUtils.formatIsoToTime(worst.getStartTime());
 
-            Date date = parser.parse(cleanDate);
-            if (date == null) return "-";
+                String end = DateUtils.formatIsoToTime(worst.getEndTime());
 
-            SimpleDateFormat formatter = new SimpleDateFormat("dd MMM • HH:mm", Locale.getDefault());
-            formatter.setTimeZone(TimeZone.getDefault());
+                tvWorstSessionDate.setText(date + "\n" +start + " - " + end);
 
-            return formatter.format(date);
+            } else {
+                tvWorstSessionDate.setText("-");
+            }
 
-        } catch (Exception e) {
-            Log.e(TAG, "Date parse error: " + dateStr, e);
-            return "-";
         }
     }
 }

@@ -3,11 +3,11 @@ package com.student.engagement.system.models.requests;
 import com.google.gson.annotations.SerializedName;
 
 public class RegisterRequest {
-    @SerializedName("email")
+
     private final String email;
-    @SerializedName("password")
+
     private final String password;
-    @SerializedName("data")
+
     private final UserData data;
 
     public RegisterRequest(String firstName, String lastName, String email, String password) {
@@ -19,9 +19,12 @@ public class RegisterRequest {
     public UserData getData() {
         return data;
     }
+
     public static class UserData {
+
         @SerializedName("first_name")
         private final String firstName;
+
         @SerializedName("last_name")
         private final String lastName;
 

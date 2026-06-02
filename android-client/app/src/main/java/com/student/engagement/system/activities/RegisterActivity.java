@@ -3,8 +3,6 @@ package com.student.engagement.system.activities;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
-import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,26 +23,34 @@ import com.student.engagement.system.models.response.AuthResponse;
 import com.student.engagement.system.networking.SupabaseClient;
 import com.student.engagement.system.services.AuthService;
 import com.student.engagement.system.session.SessionManager;
-import com.student.engagement.system.utils.Field;
-import com.student.engagement.system.utils.ValidationResult;
+import com.student.engagement.system.validation.FormField;
+import com.student.engagement.system.utils.FormUtils;
+import com.student.engagement.system.validation.FormValidation;
+import com.student.engagement.system.utils.ViewUtils;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class RegisterActivity extends AppCompatActivity {
+
     private static final String TAG = "REGISTER";
+
     private static final String EMAIL_REGEX = "^[A-Za-z0-9._%+-]+@ie\\.ase\\.ro$";
-    public enum RegisterField implements Field {FIRST_NAME, LAST_NAME, EMAIL, PASSWORD, CONFIRM_PASSWORD}
+
+    public enum RegisterField implements FormField {FIRST_NAME, LAST_NAME, EMAIL, PASSWORD, CONFIRM_PASSWORD}
+
     private TextInputLayout tilFirstName, tilLastName, tilEmail, tilPassword, tilConfirmPassword;
+
     private TextInputEditText etFirstName, etLastName, etEmail, etPassword, etConfirmPassword;
+
     private MaterialButton btnRegister;
+
     private TextView tvLogin;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate: Initializing RegisterActivity...");
 
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_register);
@@ -68,11 +74,11 @@ public class RegisterActivity extends AppCompatActivity {
         etPassword = findViewById(R.id.etPassword);
         etConfirmPassword = findViewById(R.id.etConfirmPassword);
 
-        tilFirstName = findParentTextInputLayout(etFirstName);
-        tilLastName = findParentTextInputLayout(etLastName);
-        tilEmail = findParentTextInputLayout(etEmail);
-        tilPassword = findParentTextInputLayout(etPassword);
-        tilConfirmPassword = findParentTextInputLayout(etConfirmPassword);
+        tilFirstName = FormUtils.findParentLayout(etFirstName);
+        tilLastName = FormUtils.findParentLayout(etLastName);
+        tilEmail = FormUtils.findParentLayout(etEmail);
+        tilPassword = FormUtils.findParentLayout(etPassword);
+        tilConfirmPassword = FormUtils.findParentLayout(etConfirmPassword);
 
         btnRegister = findViewById(R.id.btnRegister);
         tvLogin = findViewById(R.id.tvLoginLink);
@@ -80,100 +86,78 @@ public class RegisterActivity extends AppCompatActivity {
 
     private void initializeEvents() {
         Runnable registerAction = () -> {
-            clearErrors();
+            FormUtils.clearErrors(tilFirstName, tilLastName, tilEmail, tilPassword, tilConfirmPassword);
 
-            ValidationResult<RegisterField> result = validateRegister();
+            FormValidation<RegisterField> result = validateRegister();
 
             if (result.isValid) {
-                Log.i(TAG, "registerAction: Validation passed. Proceeding to API call.");
                 performRegistration();
             } else {
-                Log.w(TAG, "registerAction: Validation failed on field " + result.field);
                 handleValidationError(result);
             }
         };
 
         btnRegister.setOnClickListener(v -> registerAction.run());
 
-        etConfirmPassword.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_DONE) {
-                v.clearFocus();
-                registerAction.run();
-                return true;
-            }
-            return false;
-        });
+        ViewUtils.onDone(etConfirmPassword, registerAction);
 
-        tvLogin.setOnClickListener(v -> {
-            Log.d(TAG, "Navigating back to Login screen.");
-            finish();
-        });
+        tvLogin.setOnClickListener(v -> finish());
+
+        FormUtils.clearErrorOnTyping(etFirstName, tilFirstName);
+        FormUtils.clearErrorOnTyping(etLastName, tilLastName);
+        FormUtils.clearErrorOnTyping(etEmail, tilEmail);
+        FormUtils.clearErrorOnTyping(etPassword, tilPassword);
+        FormUtils.clearErrorOnTyping(etConfirmPassword, tilConfirmPassword);
     }
 
-    private void clearErrors() {
-        tilFirstName.setError(null);
-        tilLastName.setError(null);
-        tilEmail.setError(null);
-        tilPassword.setError(null);
-        tilConfirmPassword.setError(null);
-    }
-
-    private void handleValidationError(ValidationResult<RegisterField> result) {
+    private void handleValidationError(FormValidation<RegisterField> result) {
         switch (result.field) {
             case FIRST_NAME:
-                tilFirstName.setError(result.message);
-                etFirstName.requestFocus();
+                FormUtils.setError(tilFirstName, etFirstName, result.message);
                 break;
             case LAST_NAME:
-                tilLastName.setError(result.message);
-                etLastName.requestFocus();
+                FormUtils.setError(tilLastName, etLastName, result.message);
                 break;
             case EMAIL:
-                tilEmail.setError(result.message);
-                etEmail.requestFocus();
+                FormUtils.setError(tilEmail, etEmail, result.message);
                 break;
             case PASSWORD:
-                tilPassword.setError(result.message);
-                etPassword.requestFocus();
+                FormUtils.setError(tilPassword, etPassword, result.message);
                 break;
             case CONFIRM_PASSWORD:
-                tilConfirmPassword.setError(result.message);
-                etConfirmPassword.requestFocus();
+                FormUtils.setError(tilConfirmPassword, etConfirmPassword, result.message);
                 break;
         }
     }
 
     private void performRegistration() {
-        btnRegister.setEnabled(false);
-        btnRegister.setText("Creating account...");
+        ViewUtils.setLoading(btnRegister, "Creating account...");
 
-        String firstName = etFirstName.getText().toString().trim();
-        String lastName = etLastName.getText().toString().trim();
-        String email = etEmail.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
+        String firstName = FormUtils.getText(etFirstName);
+        String lastName = FormUtils.getText(etLastName);
+        String email = FormUtils.getText(etEmail);
+        String password = FormUtils.getText(etPassword);
 
-        Log.d(TAG, "performRegistration: Calling Auth Service for " + email);
         AuthService service = SupabaseClient.getInstance(this).create(AuthService.class);
         RegisterRequest request = new RegisterRequest(firstName, lastName, email, password);
 
         service.register(request).enqueue(new Callback<AuthResponse>() {
             @Override
             public void onResponse(@NonNull Call<AuthResponse> call, @NonNull Response<AuthResponse> response) {
-                resetButton();
-                Log.d(TAG, "onResponse: Received status code " + response.code());
+                ViewUtils.resetButton(btnRegister, "Create Account");
 
                 if (response.isSuccessful() && response.body() != null) {
                     processRegisterSuccess(response.body());
                 } else {
-                    Log.e(TAG, "onResponse: Registration failed. Body: " + response.errorBody());
+                    Log.e(TAG, "onResponse: Registration failed.");
+                    FormUtils.setError(tilEmail, etEmail, "Email already exists!");
                     Toast.makeText(RegisterActivity.this, "Registration failed. This email might already be registered.", Toast.LENGTH_LONG).show();
                 }
             }
-
             @Override
             public void onFailure(@NonNull Call<AuthResponse> call, @NonNull Throwable t) {
                 Log.e(TAG, "onFailure: Network error -> " + t.getMessage());
-                resetButton();
+                ViewUtils.resetButton(btnRegister, "Create Account");
                 Toast.makeText(RegisterActivity.this, "Network error. Check your connection.", Toast.LENGTH_LONG).show();
             }
         });
@@ -181,18 +165,16 @@ public class RegisterActivity extends AppCompatActivity {
 
     private void processRegisterSuccess(AuthResponse data) {
         if (data.getUser() == null) {
-            Log.e(TAG, "processRegisterSuccess: User object is null in response.");
+            Log.e(TAG, "User object is null in response.");
+            Toast.makeText(this, "Something went wrong", Toast.LENGTH_LONG).show();
             return;
         }
 
         if (data.getAccessToken() == null) {
-            Log.i(TAG, "processRegisterSuccess: Account created.");
             Toast.makeText(this, "Account created! Please check your email to confirm.", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
-
-        Log.i(TAG, "processRegisterSuccess: Direct login success. Saving session.");
 
         String fName = "";
         String lName = "";
@@ -214,43 +196,43 @@ public class RegisterActivity extends AppCompatActivity {
         SupabaseClient.reset();
         startActivity(new Intent(this, MainActivity.class));
         finish();
+        overridePendingTransition(0,0);
     }
 
-    private void resetButton() {
-        btnRegister.setEnabled(true);
-        btnRegister.setText("Create Account");
-    }
-
-    private ValidationResult<RegisterField> validateRegister() {
-        String firstName = etFirstName.getText().toString().trim();
-        if (firstName.isEmpty()) return ValidationResult.error(RegisterField.FIRST_NAME, "First name is required!");
-
-        String lastName = etLastName.getText().toString().trim();
-        if (lastName.isEmpty()) return ValidationResult.error(RegisterField.LAST_NAME, "Last name is required!");
-
-        String email = etEmail.getText().toString().trim();
-        if (email.isEmpty()) return ValidationResult.error(RegisterField.EMAIL, "Email is required!");
-        if (!email.matches(EMAIL_REGEX)) return ValidationResult.error(RegisterField.EMAIL, "Please use your @ie.ase.ro address!");
-
-        String password = etPassword.getText().toString().trim();
-        if (password.isEmpty()) return ValidationResult.error(RegisterField.PASSWORD, "Password is required!");
-        if (password.length() < 6) return ValidationResult.error(RegisterField.PASSWORD, "Password must be at least 6 characters!");
-
-        String confirm = etConfirmPassword.getText().toString().trim();
-        if (!confirm.equals(password)) return ValidationResult.error(RegisterField.CONFIRM_PASSWORD, "Passwords do not match!");
-
-        return ValidationResult.valid();
-    }
-
-    private TextInputLayout findParentTextInputLayout(View view) {
-        if (view.getParent() instanceof View) {
-            View parent = (View) view.getParent();
-            if (parent instanceof TextInputLayout) {
-                return (TextInputLayout) parent;
-            } else if (parent.getParent() instanceof TextInputLayout) {
-                return (TextInputLayout) parent.getParent();
-            }
+    private FormValidation<RegisterField> validateRegister() {
+        String firstName = FormUtils.getText(etFirstName);
+        if (firstName.isEmpty()) {
+            return FormValidation.error(RegisterField.FIRST_NAME, "First name is required!");
         }
-        return null;
+
+        String lastName = FormUtils.getText(etLastName);
+        if (lastName.isEmpty()) {
+            return FormValidation.error(RegisterField.LAST_NAME, "Last name is required!");
+        }
+
+        String email = FormUtils.getText(etEmail);
+        if (email.isEmpty()) {
+            return FormValidation.error(RegisterField.EMAIL, "Email is required!");
+        }
+        if (!email.matches(EMAIL_REGEX)){
+            return FormValidation.error(RegisterField.EMAIL, "Please use your @ie.ase.ro address!");
+        }
+
+        String password = FormUtils.getText(etPassword);
+        if (password.isEmpty()) {
+            return FormValidation.error(RegisterField.PASSWORD, "Password is required!");
+        }
+        if (password.length() < 6) {
+            return FormValidation.error(RegisterField.PASSWORD, "Password must be at least 6 characters!");
+        }
+
+        String confirm = FormUtils.getText(etConfirmPassword);
+        if (confirm.isEmpty()){
+            return FormValidation.error(RegisterField.CONFIRM_PASSWORD, "Please confirm your password!");
+        }
+        if (!confirm.equals(password)) {
+            return FormValidation.error(RegisterField.CONFIRM_PASSWORD, "Passwords do not match!");
+        }
+        return FormValidation.valid();
     }
 }

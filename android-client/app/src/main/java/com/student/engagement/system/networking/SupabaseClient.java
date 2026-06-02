@@ -10,8 +10,10 @@ import org.json.JSONObject;
 
 import java.util.concurrent.TimeUnit;
 
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.Route;
 import okhttp3.Authenticator;
@@ -21,15 +23,25 @@ import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 public class SupabaseClient {
-    private static final String TAG = "SupabaseClient";
+
+    private static final String TAG = "SUPABASE_CLIENT";
+
     private static Retrofit instance = null;
 
-    public static synchronized Retrofit getInstance(Context context) {
+    private static OkHttpClient refreshClient;
 
+    public static synchronized Retrofit getInstance(Context context) {
         Context appContext = context.getApplicationContext();
 
-        if (instance == null) {
+        if(refreshClient == null) {
+            refreshClient = new OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(30, TimeUnit.SECONDS)
+                    .build();
+        }
 
+        if (instance == null) {
             OkHttpClient.Builder builder = new OkHttpClient.Builder()
                     .connectTimeout(30, TimeUnit.SECONDS)
                     .readTimeout(30, TimeUnit.SECONDS)
@@ -42,7 +54,6 @@ public class SupabaseClient {
             }
 
             builder.addInterceptor(chain -> {
-
                 String token = SessionManager.getToken(appContext);
 
                 Request.Builder requestBuilder = chain.request().newBuilder()
@@ -58,38 +69,44 @@ public class SupabaseClient {
             builder.authenticator(new Authenticator() {
                 @Override
                 public Request authenticate(Route route, Response response) {
-
                     if (responseCount(response) >= 2) {
-                        Log.e(TAG, "Auth loop detected. Aborting.");
+                        Log.e(TAG, "Auth loop detected.");
                         return null;
+                    }
+                    String currentToken = SessionManager.getToken(appContext);
+                    String requestToken = response.request().header("Authorization");
+
+                    if(requestToken != null && !requestToken.equals("Bearer " + currentToken)) {
+                        return response.request().newBuilder()
+                                .header("Authorization", "Bearer " + currentToken)
+                                .build();
                     }
 
                     String refreshToken = SessionManager.getRefreshToken(appContext);
 
                     if (refreshToken == null || refreshToken.isEmpty()) {
-                        Log.e(TAG, "No refresh token available.");
+                        SessionManager.clearSession(appContext);
+                        SupabaseClient.reset();
                         return null;
                     }
 
-                    Log.d(TAG, "Access token expired. Attempting refresh...");
-
                     try {
+                        String refreshUrl = BuildConfig.SUPABASE_URL + "auth/v1/token?grant_type=refresh_token";
 
-                        String baseUrl = BuildConfig.SUPABASE_URL;
-                        String refreshUrl = (baseUrl.endsWith("/") ? baseUrl : baseUrl + "/")
-                                + "auth/v1/token?grant_type=refresh_token";
+                        JSONObject jsonObject = new JSONObject();
+                        jsonObject.put("refresh_token", refreshToken);
+
+                        RequestBody requestBody = RequestBody.create(
+                                jsonObject.toString(),
+                                MediaType.get("application/json")
+                        );
 
                         Request refreshRequest = new Request.Builder()
                                 .url(refreshUrl)
-                                .post(okhttp3.RequestBody.create(
-                                        okhttp3.MediaType.get("application/json"),
-                                        "{\"refresh_token\":\"" + refreshToken + "\"}"
-                                ))
+                                .post(requestBody)
                                 .header("apikey", BuildConfig.SUPABASE_KEY)
                                 .header("Content-Type", "application/json")
                                 .build();
-
-                        OkHttpClient refreshClient = new OkHttpClient();
 
                         try (Response refreshResponse =
                                      refreshClient.newCall(refreshRequest).execute()) {
@@ -109,15 +126,13 @@ public class SupabaseClient {
 
                             SessionManager.updateTokens(appContext, newAccessToken, newRefreshToken);
 
-                            Log.d(TAG, "Token refreshed successfully.");
-
                             return response.request().newBuilder()
                                     .header("Authorization", "Bearer " + newAccessToken)
                                     .build();
                         }
 
                     } catch (Exception e) {
-                        Log.e(TAG, "Critical error in authenticator: " + e.getMessage());
+                        Log.e(TAG, "Error in authenticator:", e);
                         return null;
                     }
                 }
@@ -135,6 +150,7 @@ public class SupabaseClient {
 
     private static int responseCount(Response response) {
         int count = 1;
+
         while ((response = response.priorResponse()) != null) {
             count++;
         }
@@ -143,5 +159,6 @@ public class SupabaseClient {
 
     public static void reset() {
         instance = null;
+        refreshClient = null;
     }
 }

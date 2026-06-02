@@ -24,6 +24,7 @@
             android:gravity="center_vertical">
 
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardLogo"
                 android:layout_width="60dp"
                 android:layout_height="60dp"
                 app:cardCornerRadius="14dp"
@@ -53,6 +54,7 @@
         </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardLoginContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="24dp"
@@ -88,6 +90,7 @@
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:id="@+id/tilEmail"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="36dp"
@@ -108,6 +111,7 @@
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:id="@+id/tilPassword"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
@@ -146,6 +150,7 @@
                     android:orientation="horizontal">
 
                     <TextView
+                        android:id="@+id/tvNoAccount"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Don't have an account? "

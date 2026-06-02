@@ -46,7 +46,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Active session setup"
+                    android:text="Set up your session"
                     android:textColor="#64748B"
                     android:textSize="13sp" />
 
@@ -91,7 +91,7 @@
                     app:startIconTint="#64748B">
 
                     <AutoCompleteTextView
-                        android:id="@+id/spSubject"
+                        android:id="@+id/actvSubject"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:inputType="none"
@@ -112,7 +112,7 @@
                     app:startIconTint="#64748B">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etStudentGroup"
+                        android:id="@+id/etGroup"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:textSize="14sp"/>
@@ -147,7 +147,7 @@
                     app:startIconTint="#64748B">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etDate"
+                        android:id="@+id/etSessionDate"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:focusable="false"
@@ -164,18 +164,70 @@
                     android:baselineAligned="false">
 
                     <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1.2"
-                        android:hint="Interval"
+                        android:hint="Start Time"
+                        app:boxCornerRadiusTopStart="12dp"
+                        app:boxCornerRadiusTopEnd="12dp"
+                        app:boxCornerRadiusBottomStart="12dp"
+                        app:boxCornerRadiusBottomEnd="12dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etSessionStartTime"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:focusable="false"
+                            android:clickable="true"
+                            android:textSize="14sp"/>
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.2"
+                        android:layout_marginStart="8dp"
+                        android:hint="End Time"
+                        app:boxCornerRadiusTopStart="12dp"
+                        app:boxCornerRadiusTopEnd="12dp"
+                        app:boxCornerRadiusBottomStart="12dp"
+                        app:boxCornerRadiusBottomEnd="12dp">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etSessionEndTime"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:focusable="false"
+                            android:clickable="true"
+                            android:textSize="14sp"/>
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="Classroom"
                         app:boxCornerRadiusTopStart="12dp"
                         app:boxCornerRadiusTopEnd="12dp"
                         app:boxCornerRadiusBottomStart="12dp"
                         app:boxCornerRadiusBottomEnd="12dp">
 
                         <AutoCompleteTextView
-                            android:id="@+id/spSessionIntervals"
+                            android:id="@+id/actvClassroom"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="none"
@@ -187,7 +239,7 @@
                         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="0.8"
+                        android:layout_weight="1"
                         android:layout_marginStart="8dp"
                         android:hint="Type"
                         app:boxCornerRadiusTopStart="12dp"
@@ -196,7 +248,7 @@
                         app:boxCornerRadiusBottomEnd="12dp">
 
                         <AutoCompleteTextView
-                            android:id="@+id/spSessionType"
+                            android:id="@+id/actvSessionType"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="none"
@@ -205,35 +257,13 @@
                     </com.google.android.material.textfield.TextInputLayout>
 
                 </LinearLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:hint="Planned Observations"
-                    app:boxCornerRadiusTopStart="12dp"
-                    app:boxCornerRadiusTopEnd="12dp"
-                    app:boxCornerRadiusBottomStart="12dp"
-                    app:boxCornerRadiusBottomEnd="12dp"
-                    app:startIconTint="#64748B">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etTotalObservationsPlanned"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="number"
-                        android:textSize="14sp"/>
-
-                </com.google.android.material.textfield.TextInputLayout>
-
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnCreateSession"
                     android:layout_width="match_parent"
                     android:layout_height="54dp"
                     android:layout_marginTop="28dp"
                     android:backgroundTint="#3E5B9B"
-                    android:text="Start Teaching Session"
+                    android:text="Create Session"
                     android:textAllCaps="false"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium"

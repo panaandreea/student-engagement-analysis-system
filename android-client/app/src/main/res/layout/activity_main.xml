@@ -6,6 +6,15 @@
     android:layout_height="match_parent"
     android:orientation="vertical" >
 
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#3E5B9B"
+        app:titleTextColor="@android:color/white"/>
+
     <FrameLayout
         android:id="@+id/fragmentContainer"
         android:layout_width="match_parent"
@@ -21,5 +30,5 @@
         app:itemIconTint="?attr/colorOnSurface"
         app:itemRippleColor="?attr/colorControlHighlight"
         app:labelVisibilityMode="labeled"
-        app:menu="@menu/main_activity_menu" />
+        app:menu="@menu/menu_main" />
 </LinearLayout>

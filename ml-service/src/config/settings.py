@@ -2,11 +2,27 @@ import os
 
 from pathlib import Path
 from typing import Dict
+from dotenv import load_dotenv
+
+
+# ==== LOAD ENVIRONMENT VARIABLES ====
+load_dotenv()
+
 
 # ==== FRAME CAPTURE CONFIGURATION ====
 CAMERA_ID: int = 0
-NUMBER_OF_FRAMES: int = 20
+FRAME_COUNT: int = 20
 CAPTURE_DURATION: float = 10.0
+
+
+# ==== SNAPSHOT TIMING CONFIGURATION (in seconds) ====
+PRE_START_DELAY: int = 30
+SNAPSHOT_INTERVAL: int = 30
+PRE_END_DELAY: int = 30
+
+
+# ==== DEVICE CONFIGURATION ====
+CLASSROOM_ID: str = os.getenv("CLASSROOM") or "default-classroom"
 
 
 # ==== PATHS ====
@@ -17,12 +33,13 @@ ASSETS_DIR = PROJECT_ROOT / "assets"
 MODELS_DIR = ASSETS_DIR / "models"
 
 # ==== MODEL PATHS ====
-FACE_DETECTOR_MODEL_PATH = MODELS_DIR / "detection" / "face-detector-yolo-v12n.onnx"
-ENGAGEMENT_MODEL_PATH = MODELS_DIR / "engagement" / "attention-level-classifier.h5"
+FACE_DETECTOR_MODEL_PATH = MODELS_DIR / "detection" / "face_detector.onnx"
+ENGAGEMENT_MODEL_PATH = MODELS_DIR / "engagement" / "engagement_classifier.h5"
+EMBEDDER_MODEL_PATH = MODELS_DIR / "recognition" / "face_embedder.onnx"
 
 
 # ==== THREADING CONFIG ====
-MAX_WORKER_THREADS: int = max(1, (os.cpu_count() or 5) - 1)
+MAX_WORKERS: int = max(1, (os.cpu_count() or 5) - 1)
 
 
 # ==== LABEL MAP ====

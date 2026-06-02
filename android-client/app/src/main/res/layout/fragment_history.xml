@@ -59,7 +59,7 @@
                     android:id="@+id/tvTotalSessionsValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="12"
+                    android:text="-"
                     android:textSize="20sp"
                     android:fontFamily="sans-serif-black"
                     android:textColor="#1E293B"/>
@@ -94,20 +94,24 @@
 
                 <TextView
                     android:id="@+id/tvBestSessionValue"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="1097"
+                    android:gravity="center"
+                    android:text="-"
                     android:textSize="16sp"
+                    android:textAlignment="center"
                     android:fontFamily="sans-serif-black"
                     android:textColor="#1E293B"/>
 
                 <TextView
                     android:id="@+id/tvBestSessionDate"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="28 Apr"
+                    android:gravity="center"
+                    android:text="-"
                     android:textSize="10sp"
-                    android:textColor="#3E5B9B"
+                    android:textAlignment="center"
+                    android:textColor="#059669"
                     android:fontFamily="sans-serif-medium"/>
 
                 <TextView
@@ -140,19 +144,23 @@
 
                 <TextView
                     android:id="@+id/tvWorstSessionValue"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="1076"
+                    android:gravity="center"
+                    android:text="-"
                     android:textSize="16sp"
+                    android:textAlignment="center"
                     android:fontFamily="sans-serif-black"
                     android:textColor="#1E293B"/>
 
                 <TextView
                     android:id="@+id/tvWorstSessionDate"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="21 Apr"
+                    android:gravity="center"
+                    android:text="-"
                     android:textSize="10sp"
+                    android:textAlignment="center"
                     android:textColor="#E53935"
                     android:fontFamily="sans-serif-medium"/>
 
@@ -197,13 +205,13 @@
     </RelativeLayout>
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvSessions"
+        android:id="@+id/rvHistorySessions"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
         android:paddingBottom="80dp"
         android:scrollbars="vertical"
-        tools:listitem="@layout/session_item" />
+        tools:listitem="@layout/item_history" />
 
 </LinearLayout>

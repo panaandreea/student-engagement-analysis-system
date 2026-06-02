@@ -1,36 +1,13 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
 
     <style name="Base.Theme.StudentEngagementSystem" parent="Theme.Material3.DayNight.NoActionBar" />
 
     <style name="Theme.StudentEngagementSystem" parent="Base.Theme.StudentEngagementSystem">
-        <item name="colorSurface">@color/white</item>
-        <item name="colorSurfaceVariant">@color/white</item>
-
         <item name="android:colorBackground">@color/white</item>
-
-        <item name="textInputStyle">@style/Widget.MyApp.TextInputLayout</item>
-
-        <item name="elevationOverlayEnabled">false</item>
-    </style>
-
-    <style name="ShapeAppearance.MyApp.Input" parent="ShapeAppearance.Material3.SmallComponent">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">12dp</item>
-    </style>
-
-    <style name="Widget.MyApp.TextInputLayout" parent="Widget.Material3.TextInputLayout.FilledBox">
-        <item name="shapeAppearanceOverlay">@style/ShapeAppearance.MyApp.Input</item>
-        <item name="boxBackgroundColor">@color/input_background</item>
-        <item name="boxStrokeWidth">0dp</item>
-        <item name="boxStrokeWidthFocused">0dp</item>
-        <item name="boxStrokeColor">@android:color/transparent</item>
-        <item name="boxBackgroundMode">filled</item>
-
-        <item name="hintTextColor">@color/text_color</item>
-        <item name="android:textColorHint">@color/text_color</item>
     </style>
 
     <style name="ShapeAppearance.MyApp.Circle" parent="ShapeAppearance.Material3.SmallComponent">
         <item name="cornerSize">50%</item>
     </style>
+
 </resources>

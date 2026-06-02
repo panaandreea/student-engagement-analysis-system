@@ -4,8 +4,6 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.util.Patterns;
-import android.view.View;
-import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,31 +23,36 @@ import com.student.engagement.system.models.response.AuthResponse;
 import com.student.engagement.system.networking.SupabaseClient;
 import com.student.engagement.system.services.AuthService;
 import com.student.engagement.system.session.SessionManager;
-import com.student.engagement.system.utils.Field;
-import com.student.engagement.system.utils.ValidationResult;
+import com.student.engagement.system.validation.FormField;
+import com.student.engagement.system.utils.FormUtils;
+import com.student.engagement.system.validation.FormValidation;
+import com.student.engagement.system.utils.ViewUtils;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class LoginActivity extends AppCompatActivity {
+
     private static final String TAG = "LOGIN";
-    public enum LoginField implements Field {EMAIL, PASSWORD}
+
+    public enum LoginField implements FormField {EMAIL, PASSWORD}
+
     private TextInputLayout tilEmail, tilPassword;
+
     private TextInputEditText etEmail, etPassword;
+
     private MaterialButton btnLogin;
+
     private TextView tvRegister;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate: LoginActivity START");
 
         boolean isLogged = SessionManager.isLoggedIn(this);
-        Log.d(TAG, "Session check - isLoggedIn = " + isLogged);
 
         if (isLogged) {
-            Log.i(TAG, "User already logged in => redirecting to MainActivity");
             goToMainActivity();
             return;
         }
@@ -67,6 +70,8 @@ public class LoginActivity extends AppCompatActivity {
 
         initializeControls();
         initializeEvents();
+
+        etEmail.requestFocus();
     }
 
     private void initializeControls() {
@@ -74,88 +79,58 @@ public class LoginActivity extends AppCompatActivity {
         etPassword = findViewById(R.id.etPassword);
         btnLogin = findViewById(R.id.btnLogin);
         tvRegister = findViewById(R.id.tvRegisterLink);
-        tilEmail = findParentTextInputLayout(etEmail);
-        tilPassword = findParentTextInputLayout(etPassword);
+        tilEmail = FormUtils.findParentLayout(etEmail);
+        tilPassword = FormUtils.findParentLayout(etPassword);
     }
 
     private void initializeEvents() {
         Runnable loginAction = () -> {
-            Log.d(TAG, "Login triggered");
+            FormUtils.clearErrors(tilEmail, tilPassword);
 
-            tilEmail.setError(null);
-            tilPassword.setError(null);
-
-            ValidationResult<LoginField> result = validateLogin();
-
-            Log.d(TAG, "Validation result -> valid: " + result.isValid);
+            FormValidation<LoginField> result = validateLogin();
 
             if (result.isValid) {
                 performLogin();
             } else {
-                Log.w(TAG, "Validation failed -> field: " + result.field + ", message: " + result.message);
                 handleValidationError(result);
             }
         };
 
-        btnLogin.setOnClickListener(v -> {
-            Log.d(TAG, "Login button clicked");
-            loginAction.run();
-        });
+        btnLogin.setOnClickListener(v -> loginAction.run());
 
-        etPassword.setOnEditorActionListener((v, actionId, event) -> {
-            Log.d(TAG, "Keyboard action -> actionId: " + actionId);
-            if (actionId == EditorInfo.IME_ACTION_DONE) {
-                Log.d(TAG, "IME_ACTION_DONE detected");
-                v.clearFocus();
-                loginAction.run();
-                return true;
-            }
-            return false;
-        });
+        ViewUtils.onDone(etPassword, loginAction);
 
         tvRegister.setOnClickListener(v -> {
-            Log.d(TAG, "Register clicked -> opening RegisterActivity");
             startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
         });
+
+        FormUtils.clearErrorOnTyping(etEmail, tilEmail);
+        FormUtils.clearErrorOnTyping(etPassword, tilPassword);
     }
 
-    private void handleValidationError(ValidationResult<LoginField> result) {
-        Log.d(TAG, "handleValidationError -> field: " + result.field);
-
+    private void handleValidationError(FormValidation<LoginField> result) {
         if (result.field == LoginField.EMAIL) {
-            tilEmail.setError(result.message);
-            etEmail.requestFocus();
+            FormUtils.setError(tilEmail, etEmail, result.message);
         } else if (result.field == LoginField.PASSWORD) {
-            tilPassword.setError(result.message);
-            etPassword.requestFocus();
+            FormUtils.setError(tilPassword, etPassword, result.message);
         }
     }
 
     private void performLogin() {
-        Log.d(TAG, "performLogin: START");
+        ViewUtils.setLoading(btnLogin, "Logging in...");
 
-        btnLogin.setEnabled(false);
-        btnLogin.setText("Authenticating...");
-
-        String email = etEmail.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
-
-        Log.d(TAG, "Login data -> email: " + email);
+        String email = FormUtils.getText(etEmail);
+        String password = FormUtils.getText(etPassword);
 
         AuthService authService = SupabaseClient.getInstance(this).create(AuthService.class);
         LoginRequest request = new LoginRequest(email, password);
 
-        Log.d(TAG, "Sending login request...");
-
         authService.login(request).enqueue(new Callback<AuthResponse>() {
             @Override
             public void onResponse(Call<AuthResponse> call, Response<AuthResponse> response) {
-                Log.d(TAG, "onResponse -> success: " + response.isSuccessful());
-
-                resetButton();
+                ViewUtils.resetButton(btnLogin, "Login");
 
                 if (response.isSuccessful() && response.body() != null) {
-                    Log.d(TAG, "Response body received");
                     processLoginSuccess(response.body());
                 } else {
                     Log.e(TAG, "Login failed -> HTTP code: " + response.code());
@@ -166,17 +141,15 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onFailure(Call<AuthResponse> call, Throwable t) {
                 Log.e(TAG, "onFailure -> " + t.getMessage(), t);
-                resetButton();
+                ViewUtils.resetButton(btnLogin, "Login");
                 Toast.makeText(LoginActivity.this, "Connection error!", Toast.LENGTH_LONG).show();
             }
         });
     }
 
     private void processLoginSuccess(AuthResponse data) {
-        Log.d(TAG, "processLoginSuccess");
-
         if (data.getUser() == null) {
-            Log.e(TAG, "User is null!");
+            Toast.makeText(this, "Unexpected error occurred!", Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -188,8 +161,6 @@ public class LoginActivity extends AppCompatActivity {
             lastName = data.getUser().getUserMetadata().getLastName();
         }
 
-        Log.d(TAG, "User data -> email: " + data.getUser().getEmail());
-
         SessionManager.saveSession(
                 this,
                 data.getAccessToken(),
@@ -199,17 +170,11 @@ public class LoginActivity extends AppCompatActivity {
                 lastName,
                 data.getUser().getEmail()
         );
-
-        Log.d(TAG, "Session saved");
-
-        SupabaseClient.reset();
-        Log.d(TAG, "SupabaseClient reset");
-
         goToMainActivity();
     }
 
     private void processLoginFailure(Response<AuthResponse> response) {
-        Log.d(TAG, "processLoginFailure");
+        FormUtils.clearErrors(tilEmail, tilPassword);
 
         String errorMessage = "Invalid email or password!";
 
@@ -226,52 +191,36 @@ public class LoginActivity extends AppCompatActivity {
             Log.e(TAG, "Error parsing errorBody", e);
         }
 
-        tilPassword.setError(errorMessage);
+        if(errorMessage.toLowerCase().contains("email")) {
+            FormUtils.setError(tilEmail, etEmail, errorMessage);
+        } else {
+            FormUtils.setError(tilPassword, etPassword, errorMessage);
+        }
         Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
     }
 
-    private void resetButton() {
-        btnLogin.setEnabled(true);
-        btnLogin.setText("Login");
-    }
 
     private void goToMainActivity() {
-        Log.i(TAG, "Navigating to MainActivity");
-        startActivity(new Intent(this, MainActivity.class));
-        finish();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+        startActivity(intent);
     }
 
-    private ValidationResult<LoginField> validateLogin() {
-        String email = etEmail.getText().toString().trim();
+    private FormValidation<LoginField> validateLogin() {
+        String email = FormUtils.getText(etEmail);
         if (email.isEmpty()) {
-            Log.w(TAG, "Email empty");
-            return ValidationResult.error(LoginField.EMAIL, "Email is required!");
+            return FormValidation.error(LoginField.EMAIL, "Email is required!");
         }
 
         if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            Log.w(TAG, "Email invalid format");
-            return ValidationResult.error(LoginField.EMAIL, "Enter a valid email!");
+            return FormValidation.error(LoginField.EMAIL, "Enter a valid email!");
         }
 
-        String password = etPassword.getText().toString().trim();
+        String password = FormUtils.getText(etPassword);
         if (password.isEmpty()) {
-            Log.w(TAG, "Password empty");
-            return ValidationResult.error(LoginField.PASSWORD, "Password is required!");
+            return FormValidation.error(LoginField.PASSWORD, "Password is required!");
         }
-
-        Log.d(TAG, "Validation OK");
-        return ValidationResult.valid();
-    }
-
-    private TextInputLayout findParentTextInputLayout(View view) {
-        if (view.getParent() instanceof View) {
-            View parent = (View) view.getParent();
-            if (parent instanceof TextInputLayout) {
-                return (TextInputLayout) parent;
-            } else if (parent.getParent() instanceof TextInputLayout) {
-                return (TextInputLayout) parent.getParent();
-            }
-        }
-        return null;
+        return FormValidation.valid();
     }
 }

@@ -3,7 +3,6 @@ package com.student.engagement.system.activities;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -21,8 +20,10 @@ import com.student.engagement.system.R;
 import com.student.engagement.system.networking.SupabaseClient;
 import com.student.engagement.system.services.AuthService;
 import com.student.engagement.system.session.SessionManager;
-import com.student.engagement.system.utils.Field;
-import com.student.engagement.system.utils.ValidationResult;
+import com.student.engagement.system.validation.FormField;
+import com.student.engagement.system.utils.FormUtils;
+import com.student.engagement.system.validation.FormValidation;
+import com.student.engagement.system.utils.ViewUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,16 +33,20 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class SecurityActivity extends AppCompatActivity {
+
     private static final String TAG = "SECURITY";
-    public enum SecurityField implements Field {NEW_PASSWORD, CONFIRM_PASSWORD}
+
+    public enum SecurityField implements FormField {NEW_PASSWORD, CONFIRM_PASSWORD}
+
     private TextInputLayout tilNewPassword, tilConfirmPassword;
+
     private TextInputEditText etNewPassword, etConfirmPassword;
+
     private MaterialButton btnSave, btnCancel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Log.d(TAG, "onCreate: Initializing SecurityActivity");
 
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_security);
@@ -61,65 +66,55 @@ public class SecurityActivity extends AppCompatActivity {
     private void initializeControls() {
         etNewPassword = findViewById(R.id.etNewPassword);
         etConfirmPassword = findViewById(R.id.etConfirmPassword);
-        tilNewPassword = findParentTextInputLayout(etNewPassword);
-        tilConfirmPassword = findParentTextInputLayout(etConfirmPassword);
+
+        tilNewPassword = FormUtils.findParentLayout(etNewPassword);
+        tilConfirmPassword = FormUtils.findParentLayout(etConfirmPassword);
+
         btnSave = findViewById(R.id.btnSave);
         btnCancel = findViewById(R.id.btnCancel);
     }
 
     private void initializeEvents() {
-        btnCancel.setOnClickListener(v -> {
-            Log.d(TAG, "Cancel clicked. Closing activity.");
-            finish();
-        });
+        btnCancel.setOnClickListener(v -> finish());
 
         btnSave.setOnClickListener(v -> {
-            Log.d(TAG, "Save clicked. Starting validation...");
-            clearErrors();
+            FormUtils.clearErrors(tilNewPassword, tilConfirmPassword);
 
-            ValidationResult<SecurityField> result = validateForm();
+            FormValidation<SecurityField> result = validateForm();
 
             if (result.isValid) {
-                Log.i(TAG, "Validation passed. Sending update request to Supabase.");
-                updatePassword(etNewPassword.getText().toString().trim());
+                performUpdatePassword(FormUtils.getText(etNewPassword));
             } else {
-                Log.w(TAG, "Validation failed: " + result.message);
                 handleValidationError(result);
             }
         });
+
+        ViewUtils.onDone(etConfirmPassword, () -> btnSave.performClick());
+
+        FormUtils.clearErrorOnTyping(etNewPassword, tilNewPassword);
+        FormUtils.clearErrorOnTyping(etConfirmPassword, tilConfirmPassword);
     }
 
-    private void clearErrors() {
-        if (tilNewPassword != null) tilNewPassword.setError(null);
-        if (tilConfirmPassword != null) tilConfirmPassword.setError(null);
-    }
-
-    private void handleValidationError(ValidationResult<SecurityField> result) {
-        if (result.field == SecurityField.NEW_PASSWORD && tilNewPassword != null) {
-            tilNewPassword.setError(result.message);
-            etNewPassword.requestFocus();
-        } else if (result.field == SecurityField.CONFIRM_PASSWORD && tilConfirmPassword != null) {
-            tilConfirmPassword.setError(result.message);
-            etConfirmPassword.requestFocus();
+    private void handleValidationError(FormValidation<SecurityField> result) {
+        if (result.field == SecurityField.NEW_PASSWORD) {
+            FormUtils.setError(tilNewPassword, etNewPassword, result.message);
+        } else if (result.field == SecurityField.CONFIRM_PASSWORD) {
+            FormUtils.setError(tilConfirmPassword, etConfirmPassword, result.message);
         }
     }
 
-    private void updatePassword(String newPassword) {
-        btnSave.setEnabled(false);
-        btnSave.setText("Updating...");
+    private void performUpdatePassword(String newPassword) {
+        ViewUtils.setLoading(btnSave, "Updating...");
 
         AuthService authService = SupabaseClient.getInstance(this).create(AuthService.class);
         Map<String, String> body = new HashMap<>();
         body.put("password", newPassword);
 
-        Log.d(TAG, "updatePassword: Executing API call...");
         authService.updatePassword(body).enqueue(new Callback<Void>() {
             @Override
             public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
-                Log.d(TAG, "onResponse: Code " + response.code());
 
                 if (response.isSuccessful()) {
-                    Log.i(TAG, "Password updated successfully. Logging out for security.");
                     Toast.makeText(SecurityActivity.this, "Password updated! Please login again.", Toast.LENGTH_LONG).show();
 
                     SessionManager.clearSession(SecurityActivity.this);
@@ -131,48 +126,39 @@ public class SecurityActivity extends AppCompatActivity {
                     finish();
                 } else {
                     Log.e(TAG, "onResponse: Update failed. Error body: " + response.errorBody());
-                    resetButton();
-                    Toast.makeText(SecurityActivity.this, "Update failed. Try again later.", Toast.LENGTH_SHORT).show();
+                    ViewUtils.resetButton(btnSave, "Save Changes");
+                    Toast.makeText(SecurityActivity.this, "Update failed. Please try again.", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
                 Log.e(TAG, "onFailure: Network Error -> " + t.getMessage());
-                resetButton();
+                ViewUtils.resetButton(btnSave, "Save Changes");
                 Toast.makeText(SecurityActivity.this, "Network Error. Check connection.", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void resetButton() {
-        btnSave.setEnabled(true);
-        btnSave.setText("Save Changes");
-    }
-
-    private ValidationResult<SecurityField> validateForm() {
-        String pass = etNewPassword.getText().toString().trim();
-        String conf = etConfirmPassword.getText().toString().trim();
+    private FormValidation<SecurityField> validateForm() {
+        String pass = FormUtils.getText(etNewPassword);
+        String conf = FormUtils.getText(etConfirmPassword);
 
         if (pass.isEmpty()) {
-            return ValidationResult.error(SecurityField.NEW_PASSWORD, "New password is required");
+            return FormValidation.error(SecurityField.NEW_PASSWORD, "New password is required");
         }
+
         if (pass.length() < 6) {
-            return ValidationResult.error(SecurityField.NEW_PASSWORD, "Password must be at least 6 characters");
+            return FormValidation.error(SecurityField.NEW_PASSWORD, "Password must be at least 6 characters");
         }
+
+        if (conf.isEmpty()) {
+            return FormValidation.error(SecurityField.CONFIRM_PASSWORD, "Please confirm your password!");
+        }
+
         if (!pass.equals(conf)) {
-            return ValidationResult.error(SecurityField.CONFIRM_PASSWORD, "Passwords do not match");
+            return FormValidation.error(SecurityField.CONFIRM_PASSWORD, "Passwords do not match");
         }
-
-        return ValidationResult.valid();
-    }
-
-    private TextInputLayout findParentTextInputLayout(View view) {
-        if (view != null && view.getParent() instanceof View) {
-            View parent = (View) view.getParent();
-            if (parent instanceof TextInputLayout) return (TextInputLayout) parent;
-            if (parent.getParent() instanceof TextInputLayout) return (TextInputLayout) parent.getParent();
-        }
-        return null;
+        return FormValidation.valid();
     }
 }

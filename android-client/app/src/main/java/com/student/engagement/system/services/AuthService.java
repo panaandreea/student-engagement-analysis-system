@@ -12,10 +12,13 @@ import retrofit2.http.POST;
 import retrofit2.http.PUT;
 
 public interface AuthService {
-    @POST("auth/v1/signup")
-    Call<AuthResponse> register(@Body RegisterRequest registerRequest);
+
     @POST("auth/v1/token?grant_type=password")
     Call<AuthResponse> login(@Body LoginRequest loginRequest);
+
+    @POST("auth/v1/signup")
+    Call<AuthResponse> register(@Body RegisterRequest registerRequest);
+
     @PUT("auth/v1/user")
     Call<Void> updatePassword(@Body Map<String, String> body);
 }

@@ -3,14 +3,19 @@ package com.student.engagement.system.models.response;
 import com.google.gson.annotations.SerializedName;
 
 public class StudentResponse {
+
     @SerializedName("student_id")
     private String studentId;
+
     @SerializedName("local_id")
-    private String localId;
+    private int localId;
+
     @SerializedName("session_id")
     private String sessionId;
+
     @SerializedName("snapshot_index")
     private int snapshotIndex;
+
     @SerializedName("attention")
     private String attention;
 
@@ -18,7 +23,7 @@ public class StudentResponse {
         return studentId;
     }
 
-    public String getLocalId() {
+    public int getLocalId() {
         return localId;
     }
 

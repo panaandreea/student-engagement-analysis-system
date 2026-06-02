@@ -27,9 +27,9 @@
                 android:id="@+id/tvSubjectGroup"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="20dp"
                 android:fontFamily="sans-serif-medium"
-                android:text="Data Structures - 1067"
+                android:text="NO DATA YET"
                 android:textColor="#2C3E50"
                 android:textSize="20sp" />
 
@@ -37,7 +37,7 @@
                 android:id="@+id/tvSessionTime"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="28 Apr • 07:30 - 09:00"
+                android:text="-"
                 android:textColor="#64748B"
                 android:textSize="12sp" />
 
@@ -56,7 +56,8 @@
                 android:layout_margin="4dp"
                 android:layout_weight="1"
                 app:cardCornerRadius="18dp"
-                app:cardElevation="2dp">
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="#FFFFFF">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -68,7 +69,7 @@
                         android:id="@+id/tvTotalStudents"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="42"
+                        android:text="-"
                         android:textColor="#2C3E50"
                         android:textSize="18sp"
                         android:textStyle="bold"/>
@@ -90,7 +91,8 @@
                 android:layout_margin="4dp"
                 android:layout_weight="1"
                 app:cardCornerRadius="18dp"
-                app:cardElevation="2dp">
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="#FFFFFF">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -102,7 +104,7 @@
                         android:id="@+id/tvDominant"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="HIGH"
+                        android:text="-"
                         android:textColor="#059669"
                         android:textSize="18sp"
                         android:textStyle="bold"/>
@@ -125,7 +127,8 @@
             android:layout_height="wrap_content"
             android:layout_margin="4dp"
             app:cardCornerRadius="18dp"
-            app:cardElevation="2dp">
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FFFFFF">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -157,19 +160,44 @@
             android:layout_marginBottom="10dp"
             android:paddingHorizontal="5dp">
 
-            <TextView
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/toggleGroupView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:fontFamily="sans-serif-bold"
-                android:text="Session Comparison"
-                android:textColor="#3E5B9B"
-                android:textSize="16sp" />
+                android:layout_alignParentStart="true"
+                android:layout_centerInParent="true"
+                app:checkedButton="@+id/btnViewComparison"
+                app:singleSelection="true"
+                app:cornerRadius="12dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnViewComparison"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Comparison"
+                    android:textAllCaps="false"
+                    android:textSize="13sp"
+                    app:strokeColor="#3E5B9B" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnViewHeatmap"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Heatmap"
+                    android:textAllCaps="false"
+                    android:textSize="13sp"
+                    app:strokeColor="#3E5B9B" />
+
+            </com.google.android.material.button.MaterialButtonToggleGroup>
 
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_alignParentEnd="true">
+                android:layout_alignParentEnd="true"
+                android:layout_centerInParent="true"
+                android:orientation="horizontal">
 
                 <ImageButton
                     android:id="@+id/btnPrevComparison"
@@ -197,103 +225,197 @@
             android:layout_height="wrap_content"
             android:layout_margin="4dp"
             app:cardCornerRadius="18dp"
-            app:cardElevation="2dp">
+            app:cardElevation="2dp"
+            app:cardBackgroundColor="#FFFFFF">
 
-            <TableLayout
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="16dp"
-                android:stretchColumns="1,2">
+                android:layout_height="wrap_content">
 
-                <TableRow android:layout_marginBottom="12dp">
-                    <TextView
-                        android:text="LEVEL"
-                        android:textColor="#64748B"
-                        android:textSize="10sp"
-                        android:textStyle="bold"/>
+                <TableLayout
+                    android:id="@+id/tableComparison"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:stretchColumns="1,2,3"
+                    android:visibility="visible">
+
+                    <TableRow android:layout_marginBottom="12dp">
+
+                        <TextView
+                            android:text="LEVEL"
+                            android:textColor="#64748B"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvLabelPrev"
+                            android:gravity="center"
+                            android:text="-"
+                            android:textColor="#64748B"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:text=""
+                            android:gravity="center"
+                            android:textColor="#64748B"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvLabelCurr"
+                            android:gravity="center"
+                            android:text="CURR"
+                            android:textColor="#64748B"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                    </TableRow>
+
+                    <TableRow>
+
+                        <TextView
+                            android:text="LOW"
+                            android:textColor="#DC2626"
+                            android:fontFamily="sans-serif-bold"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvPrevLow"
+                            android:gravity="center"
+                            android:text="-"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvDeltaLow"
+                            android:gravity="center"
+                            android:text="-"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:id="@+id/tvCurrLow"
+                            android:gravity="center"
+                            android:text="0"
+                            android:textColor="#DC2626"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                    </TableRow>
+
+                    <TableRow>
+
+                        <TextView
+                            android:text="MED"
+                            android:textColor="#D97706"
+                            android:fontFamily="sans-serif-bold"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvPrevMedium"
+                            android:gravity="center"
+                            android:text="-"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvDeltaMed"
+                            android:gravity="center"
+                            android:text="-"
+                            android:layout_weight="1"
+                            android:textStyle="bold"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvCurrMedium"
+                            android:gravity="center"
+                            android:text="0"
+                            android:textColor="#D97706"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                    </TableRow>
+
+                    <TableRow>
+
+                        <TextView
+                            android:text="HIGH"
+                            android:textColor="#059669"
+                            android:fontFamily="sans-serif-bold"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvPrevHigh"
+                            android:gravity="center"
+                            android:text="-"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvDeltaHigh"
+                            android:gravity="center"
+                            android:text="-"
+                            android:layout_weight="1"
+                            android:textStyle="bold"
+                            android:layout_width="0dp"/>
+
+                        <TextView
+                            android:id="@+id/tvCurrHigh"
+                            android:gravity="center"
+                            android:text="0"
+                            android:textColor="#059669"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"/>
+
+                    </TableRow>
+
+                </TableLayout>
+
+                <LinearLayout
+                    android:id="@+id/layoutHeatmap"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:gravity="center_horizontal"
+                    android:visibility="gone">
 
                     <TextView
-                        android:id="@+id/tvLabelPrev"
+                        android:id="@+id/tvSnapshotTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:text="PREVIOUS"
-                        android:textColor="#64748B"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
+                        android:text="Snapshot -"
+                        android:textColor="#2C3E50"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"/>
 
-                    <TextView
-                        android:id="@+id/tvLabelCurr"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="CURRENT"
-                        android:textColor="#64748B"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
+                    <ImageView
+                        android:id="@+id/ivHeatmap"
+                        android:layout_width="match_parent"
+                        android:layout_height="200dp"
+                        android:scaleType="fitCenter"
+                        android:adjustViewBounds="true"
+                        android:contentDescription="Classroom Heatmap"
+                        tools:src="@android:drawable/ic_menu_gallery" />
 
-                </TableRow>
+                </LinearLayout>
 
-                <TableRow android:layout_marginBottom="8dp">
-                    <TextView
-                        android:fontFamily="sans-serif-bold"
-                        android:text="LOW"
-                        android:textColor="#DC2626"/>
-
-                    <TextView
-                        android:id="@+id/tvPrevLow"
-                        android:gravity="center"
-                        android:text="-" />
-
-                    <TextView
-                        android:id="@+id/tvCurrLow"
-                        android:gravity="end"
-                        android:text="0 (0%)"
-                        android:textColor="#DC2626"/>
-
-                </TableRow>
-
-                <TableRow
-                    android:layout_marginBottom="8dp">
-
-                    <TextView
-                        android:fontFamily="sans-serif-bold"
-                        android:text="MED"
-                        android:textColor="#D97706"/>
-
-                    <TextView
-                        android:id="@+id/tvPrevMedium"
-                        android:gravity="center"
-                        android:text="-" />
-
-                    <TextView
-                        android:id="@+id/tvCurrMedium"
-                        android:gravity="end"
-                        android:text="0 (0%)"
-                        android:textColor="#D97706"/>
-
-                </TableRow>
-
-                <TableRow>
-                    <TextView
-                        android:fontFamily="sans-serif-bold"
-                        android:text="HIGH"
-                        android:textColor="#059669"/>
-
-                    <TextView
-                        android:id="@+id/tvPrevHigh"
-                        android:gravity="center"
-                        android:text="-" />
-
-                    <TextView
-                        android:id="@+id/tvCurrHigh"
-                        android:gravity="end"
-                        android:text="0 (0%)"
-                        android:textColor="#059669"/>
-
-                </TableRow>
-
-            </TableLayout>
+            </FrameLayout>
 
         </com.google.android.material.card.MaterialCardView>
 

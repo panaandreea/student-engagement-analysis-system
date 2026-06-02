@@ -1,5 +1,6 @@
 package com.student.engagement.system.fragments;
 
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -37,11 +38,12 @@ public class ProfileFragment extends Fragment {
 
     private final ActivityResultLauncher<String> imagePicker =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
-                if (uri != null) {
-                    if (saveImageToInternalStorage(uri)) {
-                        loadProfileImage();
-                        Toast.makeText(requireContext(), "Profile image updated!", Toast.LENGTH_SHORT).show();
-                    }
+                if (uri != null && saveImageToInternalStorage(uri)) {
+
+                    if (!isAdded()) return;
+
+                    loadProfileImage();
+                    Toast.makeText(requireContext(), "Profile image updated!", Toast.LENGTH_LONG).show();
                 }
             });
 
@@ -59,11 +61,11 @@ public class ProfileFragment extends Fragment {
         loadProfileImage();
 
         layoutSecurity.setOnClickListener(v -> {
-            Intent intent = new Intent(requireActivity(), SecurityActivity.class);
-            startActivity(intent);
+            startActivity(new Intent(requireActivity(), SecurityActivity.class));
         });
 
         ivProfile.setOnClickListener(v -> imagePicker.launch("image/*"));
+
         layoutLogout.setOnClickListener(v -> performLogout());
     }
 
@@ -72,16 +74,17 @@ public class ProfileFragment extends Fragment {
         String lastName = SessionManager.getLastName(requireContext());
         String email = SessionManager.getEmail(requireContext());
 
-        String fullName = String.format("%s %s",
-                (firstName != null ? firstName : ""),
-                (lastName != null ? lastName : "")).trim();
+        String fullName = (firstName + " " + lastName).trim();
 
         tvName.setText(fullName.isEmpty() ? "User" : fullName);
-        tvEmail.setText(email != null && !email.isEmpty() ? email : "teacher@ie.ase.ro");
+        tvEmail.setText(
+                (email == null || email.isEmpty()) ? "teacher@ie.ase.ro" : email
+        );
     }
 
     private void loadProfileImage() {
         File file = new File(requireContext().getFilesDir(), getFileNameForCurrentUser());
+
         if (file.exists()) {
             ivProfile.setImageURI(null);
             ivProfile.setImageURI(Uri.fromFile(file));
@@ -91,34 +94,50 @@ public class ProfileFragment extends Fragment {
     }
 
     private boolean saveImageToInternalStorage(Uri uri) {
-        File file = new File(requireContext().getFilesDir(), getFileNameForCurrentUser());
-        try (InputStream inputStream = requireContext().getContentResolver().openInputStream(uri);
+        Context context = getContext();
+        if (context == null) {
+            return false;
+        }
+
+        File file = new File(context.getFilesDir(), getFileNameForCurrentUser());
+
+
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri);
+
              OutputStream outputStream = new FileOutputStream(file)) {
+
+            if (inputStream == null) return false;
 
             byte[] buffer = new byte[1024];
             int length;
+
             while ((length = inputStream.read(buffer)) > 0) {
                 outputStream.write(buffer, 0, length);
             }
+
             return true;
+
         } catch (Exception e) {
-            Log.e(TAG, "Error saving image: " + e.getMessage());
+            Log.e(TAG, "Error saving image: ", e);
             return false;
         }
     }
 
     private String getFileNameForCurrentUser() {
         String userId = SessionManager.getUserId(requireContext());
-        return "profile_img_" + (userId != null ? userId : "default") + ".jpg";
+        return "profile_img_" +
+                (userId != null && !userId.isEmpty() ? userId : "default") +
+                ".jpg";
     }
 
     private void performLogout() {
-        Log.d(TAG, "Performing Logout...");
         SessionManager.clearSession(requireContext());
+        redirectToLogin();
+    }
 
+    private void redirectToLogin(){
         Intent intent = new Intent(requireActivity(), LoginActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
-        requireActivity().finish();
     }
 }

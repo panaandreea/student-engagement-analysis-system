@@ -1,5 +1,6 @@
 package com.student.engagement.system.fragments;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
@@ -7,31 +8,31 @@ import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TableLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.bumptech.glide.Glide;
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.student.engagement.system.R;
 import com.student.engagement.system.models.response.MonitorResponse;
-import com.student.engagement.system.models.response.SessionResponse;
-import com.student.engagement.system.models.response.TeacherSubjectResponse;
 import com.student.engagement.system.networking.SupabaseClient;
 import com.student.engagement.system.services.MonitorService;
-import com.student.engagement.system.services.SessionService;
 import com.student.engagement.system.session.SessionManager;
+import com.student.engagement.system.utils.DateUtils;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,288 +41,308 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 public class MonitorFragment extends Fragment {
+
     private static final String TAG = "MONITOR";
+
     private static final String COLOR_LOW = "#DC2626";
-    private static final String COLOR_MEDIUM = "#D97706";
+
+    private static final String COLOR_MED = "#D97706";
+
     private static final String COLOR_HIGH = "#059669";
+
     private BarChart barChart;
-    private TextView tvSubjectGroup;
-    private TextView tvSessionTime;
-    private TextView tvTotalStudents;
-    private TextView tvDominant;
-    private TextView tvCurrLow;
-    private TextView tvCurrMedium;
-    private TextView tvCurrHigh;
-    private ImageButton btnPrev;
-    private ImageButton btnNext;
+
+    private TableLayout tableComparison;
+
+    private LinearLayout layoutHeatmap;
+
+    private TextView tvSnapshotTitle;
+
+    private ImageView ivHeatmap;
+
+    private MaterialButtonToggleGroup toggleGroupView;
+
+    private TextView tvSubjectGroup, tvSessionTime;
+
+    private TextView tvTotalStudents, tvDominant;
+
+    private TextView tvPrevLow, tvPrevMedium, tvPrevHigh;
+
+    private TextView tvCurrLow, tvCurrMedium, tvCurrHigh;
+
+    private TextView tvDeltaLow, tvDeltaMed, tvDeltaHigh;
+
+    private TextView tvLabelPrev, tvLabelCurr;
+
+    private ImageButton btnPrev, btnNext;
+
     private List<MonitorResponse> snapshotList = new ArrayList<>();
+
     private int currentIndex = 0;
-    private String activeSessionId;
-    private String teacherId;
+
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final int INTERVAL = 10000;
+
+    private final int INTERVAL = 5000;
+
 
     public MonitorFragment() {
         super(R.layout.fragment_monitor);
     }
 
+    private final Runnable refreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            loadSnapshots();
+            handler.postDelayed(this, INTERVAL);
+        }
+    };
+
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
-        Log.d(TAG, "=== MONITOR START ===");
-
-        mapUI(view);
+        init(view);
         setupChart();
         setupButtons();
-        loadActiveSession();
+        loadSnapshots();
+        setupToggle();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        Log.d(TAG, "onResume -> start polling");
         handler.post(refreshRunnable);
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        Log.d(TAG, "onPause -> stop polling");
         handler.removeCallbacks(refreshRunnable);
     }
 
-    private final Runnable refreshRunnable = new Runnable() {
-        @Override
-        public void run() {
-            Log.d(TAG, "Polling...");
-            loadActiveSession();
-            handler.postDelayed(this, INTERVAL);
-        }
-    };
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        handler.removeCallbacksAndMessages(null);
+    }
 
-    private void mapUI(View view) {
-        barChart = view.findViewById(R.id.barChart);
-        tvSubjectGroup = view.findViewById(R.id.tvSubjectGroup);
-        tvSessionTime = view.findViewById(R.id.tvSessionTime);
-        tvTotalStudents = view.findViewById(R.id.tvTotalStudents);
-        tvDominant = view.findViewById(R.id.tvDominant);
+    private void init(View v) {
+        barChart = v.findViewById(R.id.barChart);
 
-        tvCurrLow = view.findViewById(R.id.tvCurrLow);
-        tvCurrMedium = view.findViewById(R.id.tvCurrMedium);
-        tvCurrHigh = view.findViewById(R.id.tvCurrHigh);
+        tableComparison = v.findViewById(R.id.tableComparison);
+        layoutHeatmap = v.findViewById(R.id.layoutHeatmap);
 
-        btnPrev = view.findViewById(R.id.btnPrevComparison);
-        btnNext = view.findViewById(R.id.btnNextComparison);
+        tvSnapshotTitle = v.findViewById(R.id.tvSnapshotTitle);
+        ivHeatmap = v.findViewById(R.id.ivHeatmap);
+
+        toggleGroupView = v.findViewById(R.id.toggleGroupView);
+
+        tvSubjectGroup = v.findViewById(R.id.tvSubjectGroup);
+        tvSessionTime = v.findViewById(R.id.tvSessionTime);
+        tvTotalStudents = v.findViewById(R.id.tvTotalStudents);
+        tvDominant = v.findViewById(R.id.tvDominant);
+
+        tvPrevLow = v.findViewById(R.id.tvPrevLow);
+        tvPrevMedium = v.findViewById(R.id.tvPrevMedium);
+        tvPrevHigh = v.findViewById(R.id.tvPrevHigh);
+
+        tvCurrLow = v.findViewById(R.id.tvCurrLow);
+        tvCurrMedium = v.findViewById(R.id.tvCurrMedium);
+        tvCurrHigh = v.findViewById(R.id.tvCurrHigh);
+
+        tvDeltaLow = v.findViewById(R.id.tvDeltaLow);
+        tvDeltaMed = v.findViewById(R.id.tvDeltaMed);
+        tvDeltaHigh = v.findViewById(R.id.tvDeltaHigh);
+
+        tvLabelPrev = v.findViewById(R.id.tvLabelPrev);
+        tvLabelCurr = v.findViewById(R.id.tvLabelCurr);
+
+        btnPrev = v.findViewById(R.id.btnPrevComparison);
+        btnNext = v.findViewById(R.id.btnNextComparison);
+
     }
 
     private void setupButtons() {
-        if (btnPrev != null) {
-            btnPrev.setOnClickListener(v -> navigateSnapshots(1));
-        }
-        if (btnNext != null) {
-            btnNext.setOnClickListener(v -> navigateSnapshots(-1));
-        }
+        btnPrev.setOnClickListener(v -> {
+            if (currentIndex + 1 < snapshotList.size()) {
+                currentIndex++;
+                updateUI();
+            }
+        });
+
+        btnNext.setOnClickListener(v -> {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateUI();
+            }
+        });
     }
 
     private void setupChart() {
+        if (barChart == null) return;
+
         barChart.getDescription().setEnabled(false);
         barChart.getLegend().setEnabled(false);
-        barChart.setDrawGridBackground(false);
-        barChart.setScaleEnabled(false);
 
         XAxis xAxis = barChart.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setDrawGridLines(false);
-        xAxis.setGranularity(1f);
         xAxis.setValueFormatter(new IndexAxisValueFormatter(new String[]{"Low", "Med", "High"}));
+        xAxis.setGranularity(1f);
+        xAxis.setDrawGridLines(false);
 
         barChart.getAxisRight().setEnabled(false);
         barChart.getAxisLeft().setAxisMinimum(0f);
         barChart.getAxisLeft().setAxisMaximum(100f);
     }
 
-    private void loadActiveSession() {
-        teacherId = SessionManager.getUserId(requireContext());
-        if (teacherId == null) {
-            Log.e(TAG, "Teacher ID is null");
-            return;
-        }
-
-        SessionService sessionService = SupabaseClient.getInstance(requireContext())
-                .create(SessionService.class);
-
-        sessionService.getTeacherSubject("eq." + teacherId, null, "id")
-                .enqueue(new Callback<List<TeacherSubjectResponse>>() {
-                    @Override
-                    public void onResponse(@NonNull Call<List<TeacherSubjectResponse>> call,
-                                           @NonNull Response<List<TeacherSubjectResponse>> response) {
-
-                        if (!response.isSuccessful() || response.body() == null || response.body().isEmpty()) {
-                            Log.e(TAG, "No teacher subjects found");
-                            return;
-                        }
-
-                        List<TeacherSubjectResponse> list = response.body();
-
-                        StringBuilder ids = new StringBuilder("in.(");
-                        for (int i = 0; i < list.size(); i++) {
-                            ids.append(list.get(i).getId());
-                            if (i < list.size() - 1) {
-                                ids.append(",");
-                            }
-                        }
-                        ids.append(")");
-
-                        String now = OffsetDateTime.now(ZoneOffset.UTC).toString();
-
-                        Log.d(TAG, "NOW UTC = " + now);
-                        Log.d(TAG, "Teacher subject filter = " + ids);
-
-                        sessionService.getActiveSessionsMulti(
-                                ids.toString(),
-                                "lte." + now,
-                                "gte." + now,
-                                1
-                        ).enqueue(new Callback<List<SessionResponse>>() {
-                            @Override
-                            public void onResponse(@NonNull Call<List<SessionResponse>> call,
-                                                   @NonNull Response<List<SessionResponse>> response) {
-
-                                if (!response.isSuccessful() || response.body() == null || response.body().isEmpty()) {
-                                    Log.e(TAG, "NO ACTIVE SESSION");
-                                    return;
-                                }
-
-                                SessionResponse session = response.body().get(0);
-                                activeSessionId = session.getId();
-
-                                Log.d(TAG, "ACTIVE SESSION = " + activeSessionId);
-                                Log.d(TAG, "GROUP = " + session.getGroupCode());
-                                Log.d(TAG, "START = " + session.getStartTime());
-                                Log.d(TAG, "END = " + session.getEndTime());
-
-                                tvSubjectGroup.setText(session.getGroupCode());
-                                tvSessionTime.setText(formatRomanianTime(session.getStartTime(), session.getEndTime()));
-
-                                loadSnapshots();
-                            }
-
-                            @Override
-                            public void onFailure(@NonNull Call<List<SessionResponse>> call,
-                                                  @NonNull Throwable t) {
-                                Log.e(TAG, "Session error", t);
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onFailure(@NonNull Call<List<TeacherSubjectResponse>> call,
-                                          @NonNull Throwable t) {
-                        Log.e(TAG, "TeacherSubject error", t);
-                    }
-                });
-    }
-
     private void loadSnapshots() {
-        if (activeSessionId == null || teacherId == null) {
-            Log.e(TAG, "Cannot load snapshots: activeSessionId or teacherId is null");
-            return;
-        }
+        Context context = getContext();
+        if (context == null) return;
 
-        MonitorService service = SupabaseClient.getInstance(requireContext())
+        String teacherId = SessionManager.getUserId(context);
+
+        if (teacherId == null || teacherId.isEmpty()) return;
+
+        MonitorService service = SupabaseClient.getInstance(context)
                 .create(MonitorService.class);
 
-        service.getMonitor("eq." + activeSessionId, "eq." + teacherId, "snapshot_index.desc")
+        service.getActiveMonitor("eq." + teacherId, "snapshot_index.desc")
                 .enqueue(new Callback<List<MonitorResponse>>() {
+
                     @Override
                     public void onResponse(@NonNull Call<List<MonitorResponse>> call,
                                            @NonNull Response<List<MonitorResponse>> response) {
 
-                        if (!response.isSuccessful() || response.body() == null) {
-                            Log.e(TAG, "Snapshot response invalid: " + response.code());
+                        if (!isAdded() || getView() == null) return;
+
+                        if (!response.isSuccessful() || response.body() == null) return;
+
+                        List<MonitorResponse> newData = response.body();
+
+                        if (newData.isEmpty()) {
+                            showNoDataState();
                             return;
                         }
 
-                        snapshotList = response.body();
-                        Log.d(TAG, "Snapshots size = " + snapshotList.size());
+                        snapshotList = newData;
 
-                        if (snapshotList.isEmpty()) {
-                            Log.d(TAG, "Session active but no data yet");
-                            return;
+                        if (currentIndex >= snapshotList.size()) {
+                            currentIndex = 0;
                         }
 
-                        currentIndex = 0;
                         updateUI();
                     }
 
                     @Override
                     public void onFailure(@NonNull Call<List<MonitorResponse>> call,
                                           @NonNull Throwable t) {
-                        Log.e(TAG, "Snapshot error", t);
+                        if (!isAdded() || getView() == null) return;
+                        Log.e(TAG, "API error", t);
                     }
                 });
     }
 
-    private void navigateSnapshots(int step) {
-        if (snapshotList.isEmpty()) {
-            Log.d(TAG, "Cannot navigate, snapshot list is empty");
-            return;
-        }
 
-        int nextIndex = currentIndex + step;
+    private void setupToggle(){
+        toggleGroupView.addOnButtonCheckedListener(
+                (group, checkedId, isChecked) ->{
+                    if(!isChecked) return;
 
-        if (nextIndex >= 0 && nextIndex < snapshotList.size()) {
-            currentIndex = nextIndex;
-            Log.d(TAG, "Navigated to snapshot list index = " + currentIndex);
-            updateUI();
-        }
+                    if(checkedId == R.id.btnViewComparison) {
+                        tableComparison.setVisibility(View.VISIBLE);
+                        layoutHeatmap.setVisibility(View.GONE);
+                    } else if (checkedId == R.id.btnViewHeatmap){
+                        tableComparison.setVisibility(View.GONE);
+                        layoutHeatmap.setVisibility(View.VISIBLE);
+
+                        updateHeatmap();
+                    }
+                }
+        );
+    }
+
+    private void updateHeatmap() {
+        if(snapshotList.isEmpty()) return;
+
+        MonitorResponse snapshot = snapshotList.get(currentIndex);
+
+        tvSnapshotTitle.setText("Snapshot " + snapshot.getSnapshotIndex());
+
+        Glide.with(requireContext())
+                .load(snapshot.getImageUrl())
+                .into(ivHeatmap);
     }
 
     private void updateUI() {
-        if (snapshotList.isEmpty()) {
-            Log.d(TAG, "updateUI skipped, no snapshots");
-            return;
-        }
+        if (!isAdded() || getView() == null) return;
+
+        if (snapshotList == null || snapshotList.isEmpty()) return;
 
         MonitorResponse curr = snapshotList.get(currentIndex);
-        int total = curr.getLow() + curr.getMedium() + curr.getHigh();
 
-        Log.d(TAG,
-                "Update UI -> snapIndex="
-                        + curr.getSnapshotIndex()
-                        + ", low=" + curr.getLow()
-                        + ", medium=" + curr.getMedium()
-                        + ", high=" + curr.getHigh()
-                        + ", total=" + total
+        MonitorResponse prev = (currentIndex + 1 < snapshotList.size())
+                ? snapshotList.get(currentIndex + 1)
+                : null;
+
+        tvLabelCurr.setText("S" + curr.getSnapshotIndex());
+        tvLabelPrev.setText(prev != null ? "S" + prev.getSnapshotIndex() : "-");
+
+        tvSubjectGroup.setText(
+                (curr.getSubjectName() != null ? curr.getSubjectName() : "-") +
+                        " - " +
+                        (curr.getGroupCode() != null ? curr.getGroupCode() : "-")
         );
 
+        tvSessionTime.setText(
+                curr.getStartTime() != null && curr.getEndTime() != null
+                        ? DateUtils.formatIsoToDateTime(curr.getStartTime()) +
+                        " - " +
+                        DateUtils.formatIsoToTime(curr.getEndTime())
+                        : "-"
+        );
+
+        int total = curr.getLow() + curr.getMedium() + curr.getHigh();
+
         tvTotalStudents.setText(String.valueOf(total));
+        updateDominant(curr);
+
         tvCurrLow.setText(String.valueOf(curr.getLow()));
         tvCurrMedium.setText(String.valueOf(curr.getMedium()));
         tvCurrHigh.setText(String.valueOf(curr.getHigh()));
 
-        updateDominant(curr);
-        updateChart(curr, total);
-    }
+        if (prev != null) {
+            tvPrevLow.setText(String.valueOf(prev.getLow()));
+            tvPrevMedium.setText(String.valueOf(prev.getMedium()));
+            tvPrevHigh.setText(String.valueOf(prev.getHigh()));
 
-    private void updateDominant(@NonNull MonitorResponse m) {
-        if (m.getHigh() >= m.getMedium() && m.getHigh() >= m.getLow()) {
-            tvDominant.setText("HIGH");
-            tvDominant.setTextColor(Color.parseColor(COLOR_HIGH));
-            Log.d(TAG, "Dominant = HIGH");
-        } else if (m.getMedium() >= m.getLow()) {
-            tvDominant.setText("MEDIUM");
-            tvDominant.setTextColor(Color.parseColor(COLOR_MEDIUM));
-            Log.d(TAG, "Dominant = MEDIUM");
+            setDelta(tvDeltaLow, prev.getLow(), curr.getLow());
+            setDelta(tvDeltaMed, prev.getMedium(), curr.getMedium());
+            setDelta(tvDeltaHigh, prev.getHigh(), curr.getHigh());
         } else {
-            tvDominant.setText("LOW");
-            tvDominant.setTextColor(Color.parseColor(COLOR_LOW));
-            Log.d(TAG, "Dominant = LOW");
+            tvPrevLow.setText("-");
+            tvPrevMedium.setText("-");
+            tvPrevHigh.setText("-");
+            tvDeltaLow.setText("-");
+            tvDeltaMed.setText("-");
+            tvDeltaHigh.setText("-");
+        }
+
+        updateChart(curr, total);
+
+        if(layoutHeatmap.getVisibility() == View.VISIBLE){
+            updateHeatmap();
         }
     }
 
-    private void updateChart(@NonNull MonitorResponse m, int total) {
+    private void updateChart(MonitorResponse m, int total) {
+        if (barChart == null) return;
+
+        barChart.clear();
+
+        if (total == 0) {
+            barChart.clear();
+            return;
+        }
+
         List<BarEntry> entries = new ArrayList<>();
         entries.add(new BarEntry(0, percent(m.getLow(), total)));
         entries.add(new BarEntry(1, percent(m.getMedium(), total)));
@@ -330,40 +351,72 @@ public class MonitorFragment extends Fragment {
         BarDataSet set = new BarDataSet(entries, "");
         set.setColors(
                 Color.parseColor(COLOR_LOW),
-                Color.parseColor(COLOR_MEDIUM),
+                Color.parseColor(COLOR_MED),
                 Color.parseColor(COLOR_HIGH)
         );
 
         BarData data = new BarData(set);
-        data.setBarWidth(0.5f);
-
         barChart.setData(data);
-        barChart.getAxisLeft().setAxisMaximum(100f);
         barChart.invalidate();
     }
 
-    private float percent(int value, int total) {
-        return total == 0 ? 0f : (value * 100f / total);
+    private void updateDominant(MonitorResponse m) {
+        int total = m.getLow() + m.getMedium() + m.getHigh();
+
+        if (total == 0) {
+            tvDominant.setText("-");
+            tvDominant.setTextColor(Color.GRAY);
+            return;
+        }
+
+        if (m.getHigh() >= m.getMedium() && m.getHigh() >= m.getLow()) {
+            tvDominant.setText("HIGH");
+            tvDominant.setTextColor(Color.parseColor(COLOR_HIGH));
+        } else if (m.getMedium() >= m.getLow()) {
+            tvDominant.setText("MED");
+            tvDominant.setTextColor(Color.parseColor(COLOR_MED));
+        } else {
+            tvDominant.setText("LOW");
+            tvDominant.setTextColor(Color.parseColor(COLOR_LOW));
+        }
     }
 
-    private String formatRomanianTime(String start, String end) {
-        try {
-            OffsetDateTime s = OffsetDateTime.parse(start);
-            OffsetDateTime e = OffsetDateTime.parse(end);
+    private void showNoDataState() {
+        snapshotList.clear();
+        currentIndex = 0;
 
-            ZoneId ro = ZoneId.of("Europe/Bucharest");
+        tvLabelPrev.setText("-");
+        tvLabelCurr.setText("CURR");
 
-            DateTimeFormatter leftFormatter = DateTimeFormatter.ofPattern("dd MMM • HH:mm");
-            DateTimeFormatter rightFormatter = DateTimeFormatter.ofPattern("HH:mm");
+        tvPrevLow.setText("-");
+        tvPrevMedium.setText("-");
+        tvPrevHigh.setText("-");
 
-            String startFormatted = s.atZoneSameInstant(ro).format(leftFormatter);
-            String endFormatted = e.atZoneSameInstant(ro).format(rightFormatter);
+        tvCurrLow.setText("0");
+        tvCurrMedium.setText("0");
+        tvCurrHigh.setText("0");
 
-            return startFormatted + " - " + endFormatted;
+        tvDeltaLow.setText("-");
+        tvDeltaMed.setText("-");
+        tvDeltaHigh.setText("-");
 
-        } catch (Exception ex) {
-            Log.e(TAG, "Time parse error", ex);
-            return "-";
+        if (barChart != null) {
+            barChart.clear();
         }
+    }
+
+    private void setDelta(TextView tv, int prev, int curr) {
+        int diff = curr - prev;
+
+        if (diff == 0) {
+            tv.setText("0");
+            return;
+        }
+
+        tv.setText((diff > 0 ? "+" : "") + diff);
+    }
+
+    private float percent(int v, int total) {
+        return total == 0 ? 0 : (v * 100f / total);
     }
 }

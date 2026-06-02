@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="8dp"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="4dp"
+    app:strokeWidth="0dp"
+    app:cardBackgroundColor="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            app:cardBackgroundColor="#F8FAFC"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_session_book"
+                app:tint="#3E5B9B" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tvCourseTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Data Structures - 1067"
+                    android:textColor="#1E293B"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    app:cardBackgroundColor="#ECFDF5"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="0dp">
+
+                    <TextView
+                        android:id="@+id/tvHighBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="3dp"
+                        android:text="HIGH"
+                        android:textColor="#059669"
+                        android:textSize="10sp"
+                        android:fontFamily="sans-serif-black" />
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvSessionDateTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="28 April  •  10:30 - 11:30"
+                android:textColor="#64748B"
+                android:textSize="13sp"
+                android:layout_marginTop="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    app:cardBackgroundColor="#EF5350"
+                    app:cardCornerRadius="4dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="0dp"/>
+                <TextView
+                    android:id="@+id/tvLowAttention"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="3" android:textSize="12sp"
+                    android:textColor="#1E293B"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="12dp"
+                    android:fontFamily="sans-serif-medium"/>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    app:cardBackgroundColor="#FFA726"
+                    app:cardCornerRadius="4dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="0dp"/>
+                <TextView
+                    android:id="@+id/tvMediumAttention"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="12" android:textSize="12sp"
+                    android:textColor="#1E293B"
+                    android:layout_marginStart="6dp"
+                    android:layout_marginEnd="12dp"
+                    android:fontFamily="sans-serif-medium"/>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
+                    app:cardBackgroundColor="#66BB6A"
+                    app:cardCornerRadius="4dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="0dp"/>
+
+                <TextView
+                    android:id="@+id/tvHighAttention"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="27" android:textSize="12sp"
+                    android:textColor="#1E293B"
+                    android:layout_marginStart="6dp"
+                    android:fontFamily="sans-serif-medium"/>
+
+                <View
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1"/>
+
+                <TextView
+                    android:id="@+id/tvStudentCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="30 Students"
+                    android:textColor="#94A3B8"
+                    android:textSize="11sp"
+                    android:fontFamily="sans-serif-medium" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/ivArrow"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="12dp"
+            android:src="@drawable/ic_session_arrow"
+            app:tint="#CBD5E1" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

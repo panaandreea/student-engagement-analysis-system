@@ -1,15 +1,21 @@
 package com.student.engagement.system.models.response;
 
 import com.google.gson.annotations.SerializedName;
+
 public class AuthResponse {
+
     @SerializedName("access_token")
     private String accessToken;
+
     @SerializedName("refresh_token")
     private String refreshToken;
+
     @SerializedName("expires_in")
     private int expiresIn;
+
     @SerializedName("token_type")
     private String tokenType;
+
     @SerializedName("user")
     private UserData user;
 
@@ -21,23 +27,18 @@ public class AuthResponse {
         return refreshToken;
     }
 
-    public int getExpiresIn() {
-        return expiresIn;
-    }
-
-    public String getTokenType() {
-        return tokenType;
-    }
-
     public UserData getUser() {
         return user;
     }
 
     public static class UserData {
+
         @SerializedName("id")
         private String id;
+
         @SerializedName("email")
         private String email;
+
         @SerializedName("user_metadata")
         private UserMetadata userMetadata;
 
@@ -54,8 +55,10 @@ public class AuthResponse {
         }
 
         public static class UserMetadata {
+
             @SerializedName("first_name")
             private String firstName;
+
             @SerializedName("last_name")
             private String lastName;
 

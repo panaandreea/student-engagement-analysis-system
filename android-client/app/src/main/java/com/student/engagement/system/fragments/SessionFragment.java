@@ -1,11 +1,15 @@
 package com.student.engagement.system.fragments;
 
 import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
+import android.content.Context;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewParent;
-import android.view.inputmethod.EditorInfo;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Toast;
@@ -20,32 +24,54 @@ import com.google.android.material.textfield.TextInputLayout;
 import com.student.engagement.system.R;
 import com.student.engagement.system.models.requests.SessionRequest;
 import com.student.engagement.system.models.requests.TeacherSubjectRequest;
+import com.student.engagement.system.models.response.SessionResponse;
 import com.student.engagement.system.models.response.SubjectResponse;
 import com.student.engagement.system.models.response.TeacherSubjectResponse;
 import com.student.engagement.system.networking.SupabaseClient;
+import com.student.engagement.system.services.ScheduledSessionService;
 import com.student.engagement.system.services.SessionService;
 import com.student.engagement.system.services.SubjectService;
+import com.student.engagement.system.services.TeacherSubjectService;
 import com.student.engagement.system.session.SessionManager;
+import com.student.engagement.system.utils.DateUtils;
+import com.student.engagement.system.validation.FormField;
+import com.student.engagement.system.utils.FormUtils;
+import com.student.engagement.system.validation.FormValidation;
+import com.student.engagement.system.utils.ViewUtils;
 
 import java.text.SimpleDateFormat;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.TimeZone;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class SessionFragment extends Fragment {
+
     private static final String TAG = "SESSION";
-    private AutoCompleteTextView spSubject, spSessionType, spSessionIntervals;
-    private TextInputEditText etStudentGroup, etDate, etTotalObservationsPlanned;
-    private TextInputLayout tilSubject, tilGroup, tilDate, tilInterval, tilType, tilObs;
+
+    public enum SessionField implements FormField {SUBJECT, GROUP, DATE, START_TIME, END_TIME, TYPE, CLASSROOM}
+
+    private AutoCompleteTextView actvSubject, actvSessionType, actvRoom;
+
+    private TextInputEditText etGroup, etSessionDateTime, etSessionStartTime, etSessionEndTime;
+
+    private TextInputLayout tilSubject, tilGroup, tilDate, tilStartTime, tilEndTime, tilType, tilRoom;
+
     private MaterialButton btnCreate;
-    private Calendar selectedDate = Calendar.getInstance();
+
+    private final Calendar selectedDate = Calendar.getInstance();
+
     private List<SubjectResponse> subjectsList = new ArrayList<>();
+
+    private boolean isEditMode = false;
+
+    private String sessionId = null;
 
 
     public SessionFragment() {
@@ -53,323 +79,558 @@ public class SessionFragment extends Fragment {
     }
 
     @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setHasOptionsMenu(true);
+    }
+
+    @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        Log.d(TAG, "onViewCreated: Initializing Session UI");
+        if (!isAdded()) return;
 
         initializeControls(view);
-        setupStaticDropdowns();
-        fetchSubjectsFromApi();
+        setupDropdowns();
+        fetchSubjects();
+        checkEditMode();
 
-        btnCreate.setOnClickListener(v -> {
-            Log.d(TAG, "Create button clicked");
-            createSessionFlow();
-        });
+        btnCreate.setOnClickListener(v -> saveSession());
     }
 
     private void initializeControls(View view) {
-        spSubject = view.findViewById(R.id.spSubject);
-        spSessionType = view.findViewById(R.id.spSessionType);
-        spSessionIntervals = view.findViewById(R.id.spSessionIntervals);
-        etStudentGroup = view.findViewById(R.id.etStudentGroup);
-        etDate = view.findViewById(R.id.etDate);
-        etTotalObservationsPlanned = view.findViewById(R.id.etTotalObservationsPlanned);
+        actvSubject = view.findViewById(R.id.actvSubject);
+        actvSessionType = view.findViewById(R.id.actvSessionType);
+        actvRoom = view.findViewById(R.id.actvClassroom);
+
+        etGroup = view.findViewById(R.id.etGroup);
+        etSessionDateTime = view.findViewById(R.id.etSessionDate);
+        etSessionStartTime = view.findViewById(R.id.etSessionStartTime);
+        etSessionEndTime = view.findViewById(R.id.etSessionEndTime);
+
         btnCreate = view.findViewById(R.id.btnCreateSession);
 
-        tilSubject = findParentTextInputLayout(spSubject);
-        tilGroup = findParentTextInputLayout(etStudentGroup);
-        tilDate = findParentTextInputLayout(etDate);
-        tilInterval = findParentTextInputLayout(spSessionIntervals);
-        tilType = findParentTextInputLayout(spSessionType);
-        tilObs = findParentTextInputLayout(etTotalObservationsPlanned);
+        tilSubject = FormUtils.findParentLayout(actvSubject);
+        tilGroup = FormUtils.findParentLayout(etGroup);
+        tilDate = FormUtils.findParentLayout(etSessionDateTime);
+        tilStartTime = FormUtils.findParentLayout(etSessionStartTime);
+        tilEndTime = FormUtils.findParentLayout(etSessionEndTime);
+        tilType = FormUtils.findParentLayout(actvSessionType);
+        tilRoom = FormUtils.findParentLayout(actvRoom);
 
-        etDate.setOnClickListener(v -> showDatePicker());
-        if (tilDate != null) {
-            tilDate.setEndIconOnClickListener(v -> showDatePicker());
-        }
+        etSessionDateTime.setOnClickListener(v -> showDatePicker());
+        etSessionStartTime.setOnClickListener(v -> showTimePicker(etSessionStartTime));
+        etSessionEndTime.setOnClickListener(v -> showTimePicker(etSessionEndTime));
 
-        etTotalObservationsPlanned.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_DONE) {
-                createSessionFlow();
-                return true;
-            }
-            return false;
-        });
+        FormUtils.clearErrorOnTyping(etGroup, tilGroup);
+        FormUtils.clearErrorOnTyping(etSessionDateTime, tilDate);
+        FormUtils.clearErrorOnTyping(etSessionStartTime, tilStartTime);
+        FormUtils.clearErrorOnTyping(etSessionEndTime, tilEndTime);
     }
 
-    private TextInputLayout findParentTextInputLayout(View view) {
-        ViewParent parent = view.getParent();
-        while (parent != null) {
-            if (parent instanceof TextInputLayout) {
-                return (TextInputLayout) parent;
-            }
-            parent = parent.getParent();
-        }
-        return null;
+    private void setupDropdowns() {
+        Context context = getContext();
+        if (context == null) return;
+
+        actvSessionType.setAdapter(new ArrayAdapter<>(
+                context,
+                android.R.layout.simple_dropdown_item_1line,
+                getResources().getStringArray(R.array.session_types)
+        ));
+
+        actvRoom.setAdapter(new ArrayAdapter<>(
+                context,
+                android.R.layout.simple_dropdown_item_1line,
+                getResources().getStringArray(R.array.session_rooms)
+        ));
     }
 
-    private void setupStaticDropdowns() {
-        String[] types = getResources().getStringArray(R.array.session_types);
-        spSessionType.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, types));
+    private void fetchSubjects() {
+        Context context = getContext();
+        if (context == null) return;
 
-        String[] intervals = getResources().getStringArray(R.array.session_intervals);
-        spSessionIntervals.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, intervals));
-    }
+        SubjectService service = SupabaseClient.getInstance(context).create(SubjectService.class);
 
-    private void showDatePicker() {
-        DatePickerDialog dialog = new DatePickerDialog(requireContext(), (view, year, month, day) -> {
-            selectedDate.set(year, month, day);
-
-            String formatted = new SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(selectedDate.getTime());
-            etDate.setText(formatted);
-
-            Log.d(TAG, "Date selected: " + formatted);
-
-            if (tilDate != null) tilDate.setError(null);
-        }, selectedDate.get(Calendar.YEAR), selectedDate.get(Calendar.MONTH), selectedDate.get(Calendar.DAY_OF_MONTH));
-
-        dialog.show();
-    }
-
-    private void fetchSubjectsFromApi() {
-        Log.d(TAG, "Fetching subjects from API...");
-
-        SubjectService service = SupabaseClient.getInstance(requireContext()).create(SubjectService.class);
         service.getSubjects().enqueue(new Callback<List<SubjectResponse>>() {
             @Override
-            public void onResponse(@NonNull Call<List<SubjectResponse>> call, @NonNull Response<List<SubjectResponse>> response) {
-                Log.d(TAG, "Subjects response: " + response.code());
+            public void onResponse(@NonNull Call<List<SubjectResponse>> call,
+                                   @NonNull Response<List<SubjectResponse>> response) {
+
+                if (!isAdded()) return;
+                Context context = getContext();
+                if (context == null) return;
 
                 if (response.isSuccessful() && response.body() != null) {
                     subjectsList = response.body();
-                    Log.d(TAG, "Subjects loaded: " + subjectsList.size());
 
-                    ArrayAdapter<SubjectResponse> adapter =
-                            new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, subjectsList);
-                    spSubject.setAdapter(adapter);
+                    actvSubject.setAdapter(new ArrayAdapter<>(
+                            context,
+                            android.R.layout.simple_dropdown_item_1line,
+                            subjectsList
+                    ));
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<List<SubjectResponse>> call, @NonNull Throwable t) {
-                Log.e(TAG, "Subjects Load Error: " + t.getMessage(), t);
+                if (!isAdded()) return;
+                Context context = getContext();
+                if (context == null) return;
+
+                Log.e(TAG, "Subjects error", t);
+                Toast.makeText(context, "Failed to load subjects", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void createSessionFlow() {
-        clearErrors();
-        if (!validateForm()) {
-            Log.w(TAG, "Validation failed");
+    private void checkEditMode() {
+
+        if (getArguments() != null &&
+                getArguments().containsKey("session")) {
+
+            isEditMode = true;
+
+            SessionResponse session =
+                    (SessionResponse) getArguments()
+                            .getSerializable("session");
+
+            if (session != null) {
+                sessionId = session.getId();
+                btnCreate.setText("Update Session");
+                prefillForm(session);
+            }
+
+        } else {
+            btnCreate.setText("Create Session");
+        }
+    }
+
+    private void showDatePicker() {
+        Context context = getContext();
+        if (context == null) return;
+
+        new DatePickerDialog(context, (v, y, m, d) -> {
+            selectedDate.set(y, m, d);
+            etSessionDateTime.setText(new SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+                    .format(selectedDate.getTime()));
+        }, selectedDate.get(Calendar.YEAR),
+                selectedDate.get(Calendar.MONTH),
+                selectedDate.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void showTimePicker(TextInputEditText target) {
+        Context context = getContext();
+        if (context == null) return;
+
+        Calendar now = Calendar.getInstance();
+
+        new TimePickerDialog(context, (v, h, min) ->
+                target.setText(String.format(Locale.getDefault(), "%02d:%02d", h, min)),
+                now.get(Calendar.HOUR_OF_DAY),
+                now.get(Calendar.MINUTE),
+                true
+        ).show();
+    }
+
+    private void prefillForm(SessionResponse session) {
+        actvSubject.setText(session.getSubjectName(), false);
+        etGroup.setText(session.getGroupCode());
+        actvSessionType.setText(session.getSessionType(), false);
+        actvRoom.setText(session.getClassroom(), false);
+
+        etSessionStartTime.setText(DateUtils.formatIsoToTime(session.getStartTime()));
+        etSessionEndTime.setText(DateUtils.formatIsoToTime(session.getEndTime()));
+
+        try {
+            OffsetDateTime offsetDateTime = OffsetDateTime.parse(session.getStartTime());
+            selectedDate.setTime(Date.from(offsetDateTime.toInstant()));
+            etSessionDateTime.setText(DateUtils.formatIsoToDateTime(session.getStartTime()));
+        } catch (Exception e) {
+            Log.e(TAG, "Date prefill error", e);
+        }
+    }
+
+    private void clearForm() {
+        actvSubject.setText("", false);
+        etGroup.setText("");
+        etSessionDateTime.setText("");
+        etSessionStartTime.setText("");
+        etSessionEndTime.setText("");
+        actvRoom.setText("", false);
+        actvSessionType.setText("", false);
+
+        selectedDate.setTimeInMillis(System.currentTimeMillis());
+        FormUtils.clearErrors(tilSubject, tilGroup, tilDate, tilStartTime, tilEndTime, tilType, tilRoom);
+    }
+
+    private FormValidation<SessionField> validateForm() {
+        if (TextUtils.isEmpty(actvSubject.getText())) {
+            return FormValidation.error(SessionField.SUBJECT, "Subject is required!");
+        }
+
+        if (TextUtils.isEmpty(etGroup.getText())) {
+            return FormValidation.error(SessionField.GROUP, "Group is required!");
+        }
+
+        if (TextUtils.isEmpty(etSessionDateTime.getText())) {
+            return FormValidation.error(SessionField.DATE, "Date is required!");
+        }
+
+        if (TextUtils.isEmpty(etSessionStartTime.getText())) {
+            return FormValidation.error(SessionField.START_TIME, "Start time is required!");
+        }
+
+        if (TextUtils.isEmpty(etSessionEndTime.getText())) {
+            return FormValidation.error(SessionField.END_TIME, "End time is required!");
+        }
+
+        if (TextUtils.isEmpty(actvRoom.getText())) {
+            return FormValidation.error(SessionField.CLASSROOM, "Class is required!");
+        }
+
+        if (TextUtils.isEmpty(actvSessionType.getText())) {
+            return FormValidation.error(SessionField.TYPE, "Type is required!");
+        }
+
+        try {
+            String[] start = etSessionStartTime.getText().toString().split(":");
+            String[] end = etSessionEndTime.getText().toString().split(":");
+
+            int startMin = Integer.parseInt(start[0]) * 60 + Integer.parseInt(start[1]);
+            int endMin = Integer.parseInt(end[0]) * 60 + Integer.parseInt(end[1]);
+
+            if (endMin <= startMin) {
+                return FormValidation.error(SessionField.END_TIME, "End time must be after start time!");
+            }
+        } catch (Exception e) {
+            return FormValidation.error(SessionField.END_TIME, "Invalid time format");
+        }
+
+        return FormValidation.valid();
+    }
+
+    private void handleValidationError(FormValidation<SessionField> result) {
+        switch (result.field) {
+            case SUBJECT:
+                FormUtils.setError(tilSubject, null, result.message);
+                break;
+            case GROUP:
+                FormUtils.setError(tilGroup, etGroup, result.message);
+                break;
+            case DATE:
+                FormUtils.setError(tilDate, etSessionDateTime, result.message);
+                break;
+            case START_TIME:
+                FormUtils.setError(tilStartTime, etSessionStartTime, result.message);
+                break;
+            case END_TIME:
+                FormUtils.setError(tilEndTime, etSessionEndTime, result.message);
+                break;
+            case TYPE:
+                FormUtils.setError(tilType, null, result.message);
+                break;
+            case CLASSROOM:
+                FormUtils.setError(tilRoom, null, result.message);
+                break;
+        }
+    }
+
+    private void saveSession() {
+        FormUtils.clearErrors(tilSubject, tilGroup, tilDate, tilStartTime, tilEndTime, tilType, tilRoom);
+
+        FormValidation<SessionField> result = validateForm();
+
+        if (!result.isValid) {
+            handleValidationError(result);
             return;
         }
 
-        btnCreate.setEnabled(false);
-        btnCreate.setText("Connecting...");
+        ViewUtils.setLoading(btnCreate, isEditMode ? "Updating..." : "Creating...");
 
-        String teacherId = SessionManager.getUserId(requireContext());
-        String selectedName = spSubject.getText().toString();
+        Context context = getContext();
+        if (context == null) return;
 
-        Log.d(TAG, "Teacher ID: " + teacherId);
-        Log.d(TAG, "Selected subject name: " + selectedName);
+        String teacherId = SessionManager.getUserId(context);
 
-        SubjectResponse selectedSubject = null;
-        for (SubjectResponse s : subjectsList) {
-            if (s.toString().equals(selectedName)) {
-                selectedSubject = s;
-                break;
+        SubjectResponse subject = getSelectedSubject();
+
+        if (teacherId == null || teacherId.isEmpty() || subject == null) {
+            ViewUtils.resetButton(btnCreate, "Create Session");
+            return;
+        }
+
+        linkTeacherToSubject(teacherId, subject.getId());
+    }
+
+    private SubjectResponse getSelectedSubject() {
+        String name = actvSubject.getText().toString().trim();
+
+        for (SubjectResponse subject : subjectsList) {
+            if (subject.toString().equals(name)) {
+                return subject;
             }
         }
+        return null;
+    }
 
-        if (selectedSubject == null) {
-            if (tilSubject != null) tilSubject.setError("Invalid subject selected");
-            resetButton();
-            return;
-        }
+    private SessionRequest buildSessionRequest(String teacherSubjectId) {
+        String startText = etSessionStartTime.getText().toString();
+        String endText = etSessionEndTime.getText().toString();
 
-        Log.d(TAG, "Selected subject ID: " + selectedSubject.getId());
+        if (!startText.contains(":") || !endText.contains(":")) return null;
 
-        linkTeacherToSubject(teacherId, selectedSubject.getId());
+        String[] startParts = startText.split(":");
+        String[] endParts = endText.split(":");
+
+        Calendar start = (Calendar) selectedDate.clone();
+        Calendar end = (Calendar) selectedDate.clone();
+
+        start.set(Calendar.HOUR_OF_DAY, Integer.parseInt(startParts[0]));
+        start.set(Calendar.MINUTE, Integer.parseInt(startParts[1]));
+        start.set(Calendar.SECOND, 0);
+
+        end.set(Calendar.HOUR_OF_DAY, Integer.parseInt(endParts[0]));
+        end.set(Calendar.MINUTE, Integer.parseInt(endParts[1]));
+        end.set(Calendar.SECOND, 0);
+
+        return new SessionRequest(
+                teacherSubjectId,
+                etGroup.getText().toString().trim(),
+                DateUtils.formatToIsoUTC(start.getTime()),
+                DateUtils.formatToIsoUTC(end.getTime()),
+                actvRoom.getText().toString().trim(),
+                actvSessionType.getText().toString().trim()
+        );
     }
 
     private void linkTeacherToSubject(String teacherId, String subjectId) {
-        Log.d(TAG, "Link teacher -> subject");
+        Context context = getContext();
+        if (context == null) return;
 
-        SessionService service = SupabaseClient.getInstance(requireContext()).create(SessionService.class);
-        service.assignSubjectToTeacher(new TeacherSubjectRequest(teacherId, subjectId)).enqueue(new Callback<Void>() {
+        TeacherSubjectService service = SupabaseClient.getInstance(context).create(TeacherSubjectService.class);
+
+        service.assignSubjectToTeacher(new TeacherSubjectRequest(teacherId, subjectId))
+                .enqueue(new Callback<Void>() {
+                    @Override
+                    public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
+                        if (!isAdded()) return;
+
+                        fetchTeacherSubjectId(teacherId, subjectId);
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
+                        if (!isAdded()) return;
+
+                        ViewUtils.resetButton(btnCreate, isEditMode ? "Update Session" : "Create Session");
+                    }
+                });
+    }
+
+    private void fetchTeacherSubjectId(String teacherId, String subjectId) {
+        Context context = getContext();
+        if (context == null) return;
+
+        TeacherSubjectService service = SupabaseClient.getInstance(context).create(TeacherSubjectService.class);
+
+        service.getTeacherSubject("eq." + teacherId, "eq." + subjectId, "id")
+                .enqueue(new Callback<List<TeacherSubjectResponse>>() {
+                    @Override
+                    public void onResponse(@NonNull Call<List<TeacherSubjectResponse>> call,
+                                           @NonNull Response<List<TeacherSubjectResponse>> response) {
+
+                        if (!isAdded()) return;
+                        Context context = getContext();
+                        if (context == null) return;
+
+                        if (response.body() == null || response.body().isEmpty()) {
+                            Toast.makeText(context, "Failed to link subject", Toast.LENGTH_SHORT).show();
+                            ViewUtils.resetButton(btnCreate, "Retry");
+                            return;
+                        }
+                        SessionRequest sessionRequest = buildSessionRequest(response.body().get(0).getId());
+
+                        if (sessionRequest == null) {
+                            Toast.makeText(context, "Invalid time format", Toast.LENGTH_SHORT).show();
+                            ViewUtils.resetButton(btnCreate, "Retry");
+                            return;
+                        }
+
+                        if (isEditMode) {
+                            updateSession(sessionRequest);
+                        } else {
+                            createSession(sessionRequest);
+                        }
+                    }
+                    @Override
+                    public void onFailure(@NonNull Call<List<TeacherSubjectResponse>> call, @NonNull Throwable t) {
+                        ViewUtils.resetButton(btnCreate, "Retry");
+                    }
+                });
+    }
+
+    private void createSession(SessionRequest sessionRequest) {
+
+        Context context = getContext();
+        if (context == null) return;
+
+        SessionService sessionService = SupabaseClient.getInstance(context).create(SessionService.class);
+
+        sessionService.checkClassroomAvailability("eq." + sessionRequest.getClassroom()).enqueue(new Callback<List<SessionResponse>>() {
+
+            @Override
+            public void onResponse(@NonNull Call<List<SessionResponse>> call, @NonNull Response<List<SessionResponse>> response) {
+
+                if (!isAdded()) return;
+
+                Context context = getContext();
+                if (context == null) return;
+
+                if (!response.isSuccessful()
+                        || response.body() == null) {
+
+                    Toast.makeText(context, "Error checking classroom", Toast.LENGTH_LONG).show();
+
+                    ViewUtils.resetButton(btnCreate, isEditMode ? "Update Session" : "Create Session");
+
+                    return;
+                }
+
+                boolean conflict = false;
+
+                OffsetDateTime newStart = OffsetDateTime.parse(sessionRequest.getStartTime());
+
+                OffsetDateTime newEnd = OffsetDateTime.parse(sessionRequest.getEndTime());
+
+                for (SessionResponse session : response.body()) {
+
+                    OffsetDateTime existingStart = OffsetDateTime.parse(session.getStartTime());
+
+                    OffsetDateTime existingEnd = OffsetDateTime.parse(session.getEndTime());
+
+                    if (newStart.isBefore(existingEnd) && newEnd.isAfter(existingStart)) {
+                        conflict = true;
+                        break;
+                    }
+                }
+
+                if (conflict) {
+
+                    Toast.makeText(context, "Classroom is not available", Toast.LENGTH_LONG).show();
+
+                    ViewUtils.resetButton(btnCreate, isEditMode ? "Update Session" : "Create Session");
+
+                    return;
+                }
+
+                sessionService.createSession(sessionRequest).enqueue(new Callback<Void>() {
+
+                    @Override
+                    public void onResponse(Call<Void> call, Response<Void> response) {
+
+                        if (!isAdded()) return;
+
+                        Context context = getContext();
+                        if (context == null) return;
+
+                        if (response.isSuccessful()) {
+                            Toast.makeText(context, "Session created!", Toast.LENGTH_LONG).show();
+                            clearForm();
+                        } else {
+                            Toast.makeText(context, "Create failed: " + response.code(), Toast.LENGTH_LONG).show();
+                        }
+                            ViewUtils.resetButton(btnCreate, isEditMode ? "Update Session" : "Create Session");
+                    }
+
+                    @Override
+                    public void onFailure(Call<Void> call, Throwable t) {
+                        if (!isAdded()) return;
+
+                        Context context = getContext();
+                        if (context == null) return;
+
+                        Log.e(TAG, "createSession error", t);
+
+                        Toast.makeText(context, "Create failed", Toast.LENGTH_LONG).show();
+
+                        ViewUtils.resetButton(btnCreate, isEditMode ? "Update Session" : "Create Session");
+                    }
+                });
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<SessionResponse>> call, @NonNull Throwable t) {
+                if (!isAdded()) return;
+
+                Context context = getContext();
+                if (context == null) return;
+
+                Log.e(TAG, "Classroom check error", t);
+
+                Toast.makeText(context, "Error checking classroom", Toast.LENGTH_LONG).show();
+
+                ViewUtils.resetButton(btnCreate, isEditMode ? "Update Session" : "Create Session");
+            }
+        });
+    }
+
+
+    private void updateSession(SessionRequest request) {
+        Context context = getContext();
+        if (context == null) return;
+
+        ScheduledSessionService service = SupabaseClient.getInstance(context).create(ScheduledSessionService.class);
+
+        service.updateSession("eq." + sessionId, request).enqueue(new Callback<Void>() {
             @Override
             public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
-                Log.d(TAG, "assignSubjectToTeacher response: " + response.code());
-                fetchTeacherSubjectId(teacherId, subjectId);
+
+                if (!isAdded()) return;
+                Context context = getContext();
+                if (context == null) return;
+
+                if (response.isSuccessful()) {
+                    Toast.makeText(context, "Session updated!", Toast.LENGTH_SHORT).show();
+                    if (getActivity() != null) {
+                        getActivity().getSupportFragmentManager().popBackStack();
+                    }
+                } else {
+                    Toast.makeText(context, "Update failed: " + response.code(), Toast.LENGTH_SHORT).show();
+                }
+
+                ViewUtils.resetButton(btnCreate, isEditMode ? "Update Session" : "Create Session");
             }
 
             @Override
             public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
-                Log.e(TAG, "assignSubjectToTeacher FAILED: " + t.getMessage(), t);
-                resetButton();
+
+                if (!isAdded()) return;
+                Context context = getContext();
+                if (context == null) return;
+
+                Log.e(TAG, "updateSession error", t);
+                Toast.makeText(context, "Update failed", Toast.LENGTH_SHORT).show();
+                ViewUtils.resetButton(btnCreate, isEditMode ? "Update Session" : "Create Session");
             }
         });
     }
 
-    private void fetchTeacherSubjectId(String teacherId, String subjectId) {
-        Log.d(TAG, "Fetching teacher_subject ID...");
-
-        SessionService service = SupabaseClient.getInstance(requireContext()).create(SessionService.class);
-        service.getTeacherSubject("eq." + teacherId, "eq." + subjectId, "id").enqueue(new Callback<List<TeacherSubjectResponse>>() {
-            @Override
-            public void onResponse(@NonNull Call<List<TeacherSubjectResponse>> call, @NonNull Response<List<TeacherSubjectResponse>> response) {
-                Log.d(TAG, "teacher_subject response: " + response.code());
-
-                if (response.isSuccessful() && response.body() != null && !response.body().isEmpty()) {
-                    String id = response.body().get(0).getId();
-                    Log.d(TAG, "teacher_subject_id: " + id);
-                    sendFinalSession(id);
-                } else {
-                    Log.e(TAG, "teacher_subject NOT found!");
-                    resetButton();
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<List<TeacherSubjectResponse>> call, @NonNull Throwable t) {
-                Log.e(TAG, "fetchTeacherSubjectId FAILED: " + t.getMessage(), t);
-                resetButton();
-            }
-        });
+    @Override
+    public void onCreateOptionsMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
+        inflater.inflate(R.menu.menu_sessions, menu);
     }
 
-    private void sendFinalSession(String teacherSubjectId) {
-        SessionService service = SupabaseClient.getInstance(requireContext()).create(SessionService.class);
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (!isAdded()) return false;
 
-        try {
-            String intervalText = spSessionIntervals.getText().toString();
-
-            String[] parts = intervalText.split(" - ");
-            String[] startT = parts[0].split(":");
-            String[] endT = parts[1].split(":");
-
-            Calendar start = (Calendar) selectedDate.clone();
-            Calendar end = (Calendar) selectedDate.clone();
-
-            start.set(Calendar.HOUR_OF_DAY, Integer.parseInt(startT[0]));
-            start.set(Calendar.MINUTE, Integer.parseInt(startT[1]));
-            end.set(Calendar.HOUR_OF_DAY, Integer.parseInt(endT[0]));
-            end.set(Calendar.MINUTE, Integer.parseInt(endT[1]));
-
-            Log.d(TAG, "Start time UTC: " + formatToIsoUTC(start));
-            Log.d(TAG, "End time UTC: " + formatToIsoUTC(end));
-
-            SessionRequest request = new SessionRequest(
-                    teacherSubjectId,
-                    etStudentGroup.getText().toString(),
-                    spSessionType.getText().toString(),
-                    formatToIsoUTC(start),
-                    formatToIsoUTC(end),
-                    Integer.parseInt(etTotalObservationsPlanned.getText().toString())
-            );
-
-            service.createSession(request).enqueue(new Callback<Void>() {
-                @Override
-                public void onResponse(@NonNull Call<Void> call, @NonNull Response<Void> response) {
-                    Log.d(TAG, "createSession response: " + response.code());
-
-                    if (response.isSuccessful()) {
-                        Toast.makeText(requireContext(), "Session Created!", Toast.LENGTH_SHORT).show();
-                        clearForm();
-                    }
-
-                    resetButton();
-                }
-
-                @Override
-                public void onFailure(@NonNull Call<Void> call, @NonNull Throwable t) {
-                    Log.e(TAG, "createSession FAILED: " + t.getMessage(), t);
-                    resetButton();
-                }
-            });
-
-        } catch (Exception e) {
-            Log.e(TAG, "Exception in sendFinalSession: " + e.getMessage(), e);
-            resetButton();
+        if (item.getItemId() == R.id.scheduled_sessions) {
+            requireActivity()
+                    .getSupportFragmentManager()
+                    .beginTransaction()
+                    .replace(R.id.fragmentContainer, new ScheduledSessionFragment())
+                    .addToBackStack(null)
+                    .commit();
+            return true;
         }
-    }
-
-    private String formatToIsoUTC(Calendar calendar) {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return sdf.format(calendar.getTime());
-    }
-
-    private void clearErrors() {
-        TextInputLayout[] layouts = {tilSubject, tilGroup, tilDate, tilInterval, tilType, tilObs};
-        for (TextInputLayout l : layouts) {
-            if (l != null) l.setError(null);
-        }
-    }
-
-    private void resetButton() {
-        Log.d(TAG, "Reset button");
-        btnCreate.setEnabled(true);
-        btnCreate.setText("Start Teaching Session");
-    }
-
-    private void clearForm() {
-        etStudentGroup.setText("");
-        etDate.setText("");
-        etTotalObservationsPlanned.setText("");
-        spSubject.setText("", false);
-        spSessionType.setText("", false);
-        spSessionIntervals.setText("", false);
-
-        clearErrors();
-    }
-
-    private boolean validateForm() {
-        boolean valid = true;
-
-        if (spSubject.getText().toString().isEmpty()) {
-            Log.w(TAG, "Subject empty");
-            if (tilSubject != null)
-                tilSubject.setError("Required");
-            valid = false;
-        }
-
-        if (etStudentGroup.getText().toString().isEmpty()) {
-            Log.w(TAG, "Group empty");
-            if (tilGroup != null)
-                tilGroup.setError("Required");
-            valid = false;
-        }
-
-        if (etDate.getText().toString().isEmpty()) {
-            Log.w(TAG, "Date empty");
-            if (tilDate != null)
-                tilDate.setError("Required");
-            valid = false;
-        }
-
-        if (spSessionIntervals.getText().toString().isEmpty()) {
-            Log.w(TAG, "Interval empty");
-            if (tilInterval != null)
-                tilInterval.setError("Required");
-            valid = false;
-        }
-
-        if (spSessionType.getText().toString().isEmpty()) {
-            Log.w(TAG, "Type empty");
-            if (tilType != null)
-                tilType.setError("Required");
-            valid = false;
-        }
-
-        if (etTotalObservationsPlanned.getText().toString().isEmpty()) {
-            Log.w(TAG, "Observations empty");
-            if (tilObs != null)
-                tilObs.setError("Required");
-            valid = false;
-        }
-
-        Log.d(TAG, "Validation result: " + valid);
-        return valid;
+        return super.onOptionsItemSelected(item);
     }
 }

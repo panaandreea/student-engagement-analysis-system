@@ -1,11 +1,13 @@
 package com.student.engagement.system.fragments;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -13,35 +15,61 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.bumptech.glide.Glide;
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
-import com.github.mikephil.charting.data.*;
+import com.github.mikephil.charting.data.BarData;
+import com.github.mikephil.charting.data.BarDataSet;
+import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import com.github.mikephil.charting.formatter.ValueFormatter;
 
+import com.google.android.material.button.MaterialButton;
 import com.student.engagement.system.R;
 import com.student.engagement.system.models.response.MonitorResponse;
 import com.student.engagement.system.models.response.StudentResponse;
 import com.student.engagement.system.networking.SupabaseClient;
-import com.student.engagement.system.services.MonitorService;
-import com.student.engagement.system.services.StudentService;
+import com.student.engagement.system.services.HistoryDetailsService;
 import com.student.engagement.system.session.SessionManager;
+import com.student.engagement.system.utils.DateUtils;
 
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class HistoryDetailsFragment extends Fragment {
+
     private static final String TAG = "HISTORY_DETAILS";
-    private String sessionId, subject, group, startTime;
+
+    private LinearLayout layoutChart, layoutHeatmap;
+
+    private ImageView ivHeatmap;
+    private TextView tvSnapshotTitle;
+
+    private ImageButton btnPrevSnapshot;
+
+    private ImageButton btnNextSnapshot;
+
+    private int currentSnapshotIndex = 0;
+
+    private MaterialButton btnViewEvolution;
+
+    private MaterialButton btnViewHeatmap;
+
+    private String sessionId, subject, group, startTime, endTime;
+
     private BarChart barChart;
+
     private TextView tvSubjectGroup, tvSessionTime, tvTotalStudents, tvDominant;
-    private ImageButton btnBack;
+
     private LinearLayout containerStudents;
+
     private final List<MonitorResponse> snapshotList = new ArrayList<>();
 
     public HistoryDetailsFragment() {
@@ -57,9 +85,8 @@ public class HistoryDetailsFragment extends Fragment {
             subject = getArguments().getString("subject");
             group = getArguments().getString("group");
             startTime = getArguments().getString("start_time");
+            endTime = getArguments().getString("end_time");
         }
-
-        Log.d(TAG, "Session ID: " + sessionId);
     }
 
     @Override
@@ -67,60 +94,112 @@ public class HistoryDetailsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         barChart = view.findViewById(R.id.barChart);
-        tvSubjectGroup = view.findViewById(R.id.tvSubjectGroup);
-        tvSessionTime = view.findViewById(R.id.tvSessionTime);
-        tvTotalStudents = view.findViewById(R.id.tvTotalStudents);
-        tvDominant = view.findViewById(R.id.tvDominant);
-        btnBack = view.findViewById(R.id.btnBack);
+
+        layoutChart = view.findViewById(R.id.layoutChart);
+        layoutHeatmap = view.findViewById(R.id.layoutHeatmap);
+
+        ivHeatmap = view.findViewById(R.id.ivHeatmap);
+        tvSnapshotTitle = view.findViewById(R.id.tvSnapshotTitle);
+
+        btnViewEvolution = view.findViewById(R.id.btnViewEvolution);
+        btnViewHeatmap = view.findViewById(R.id.btnViewHeatmap);
+        
+        btnPrevSnapshot = view.findViewById(R.id.btnPrevSnapshot);
+        btnNextSnapshot = view.findViewById(R.id.btnNextSnapshot);
+
         containerStudents = view.findViewById(R.id.containerStudents);
+        tvSubjectGroup = view.findViewById(R.id.tvCourseTitle);
+        tvSessionTime = view.findViewById(R.id.tvSessionDateTime);
+        tvTotalStudents = view.findViewById(R.id.tvStudentCount);
+        tvDominant = view.findViewById(R.id.tvDominantAttention);
+        tvSubjectGroup.setText((subject != null ? subject : "-") + " - " + (group != null ? group : "-"));
 
-        tvSubjectGroup.setText(subject + " - " + group);
-        tvSessionTime.setText(formatTime(startTime));
+        if (startTime != null && endTime != null) {
 
-        btnBack.setOnClickListener(v -> requireActivity().onBackPressed());
+            String date = DateUtils.formatIsoToDate(startTime);
+
+            String start = DateUtils.formatIsoToTime(startTime);
+
+            String end = DateUtils.formatIsoToTime(endTime);
+
+            tvSessionTime.setText(date + " • " + start + " - " + end);
+
+        } else {
+            tvSessionTime.setText("-");
+        }
 
         setupChart();
-
         loadSnapshots();
         loadStudentEvolution();
+
+        btnViewEvolution.setOnClickListener(v -> {
+            layoutChart.setVisibility(View.VISIBLE);
+            layoutHeatmap.setVisibility(View.GONE);
+        });
+
+        btnViewHeatmap.setOnClickListener(v -> {
+            layoutChart.setVisibility(View.GONE);
+            layoutHeatmap.setVisibility(View.VISIBLE);
+
+            showHeatmap(currentSnapshotIndex);
+        });
+
+        btnPrevSnapshot.setOnClickListener(v -> {
+            if(snapshotList.isEmpty()) return;
+
+            currentSnapshotIndex--;
+
+            if(currentSnapshotIndex < 0){
+                currentSnapshotIndex = snapshotList.size() - 1;
+            }
+
+            showHeatmap(currentSnapshotIndex);
+        });
+
+        btnNextSnapshot.setOnClickListener(v->{
+            if(snapshotList.isEmpty()) return;
+
+            currentSnapshotIndex++;
+
+            if(currentSnapshotIndex >= snapshotList.size()){
+                currentSnapshotIndex = 0;
+            }
+            showHeatmap(currentSnapshotIndex);
+        });
+
     }
 
-    private void loadSnapshots() {
+    private void showHeatmap(int position) {
+        if (snapshotList.isEmpty()){
+            return;
+        }
 
-        MonitorService service = SupabaseClient.getInstance(requireContext())
-                .create(MonitorService.class);
+        if (position < 0 || position >= snapshotList.size()) {
+            return;
+        }
 
-        service.getMonitor(
-                "eq." + sessionId,
-                "eq." + SessionManager.getUserId(requireContext()),
-                "snapshot_index.asc"
-        ).enqueue(new Callback<List<MonitorResponse>>() {
+        MonitorResponse snapshot = snapshotList.get(position);
 
-            @Override
-            public void onResponse(Call<List<MonitorResponse>> call,
-                                   Response<List<MonitorResponse>> response) {
+        tvSnapshotTitle.setText("Snapshot " + snapshot.getSnapshotIndex());
 
-                if (response.isSuccessful() && response.body() != null) {
+        Glide.with(this)
+                .load(snapshot.getImageUrl())
+                .into(ivHeatmap);
 
-                    snapshotList.clear();
-                    snapshotList.addAll(response.body());
+    }
 
-                    Log.d(TAG, "Snapshots loaded: " + snapshotList.size());
-
-                    drawChart();
-                    updateCards();
-                }
-            }
-
-            @Override
-            public void onFailure(Call<List<MonitorResponse>> call, Throwable t) {
-                Log.e(TAG, "Snapshot error", t);
-            }
-        });
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        barChart = null;
+        tvSubjectGroup = null;
+        tvSessionTime = null;
+        tvTotalStudents = null;
+        tvDominant = null;
+        containerStudents = null;
     }
 
     private void setupChart() {
-
         barChart.getDescription().setEnabled(false);
         barChart.getLegend().setEnabled(false);
 
@@ -132,7 +211,49 @@ public class HistoryDetailsFragment extends Fragment {
         barChart.getAxisRight().setEnabled(false);
     }
 
+    private void loadSnapshots() {
+        Context context = getContext();
+        if (context == null) return;
+
+        HistoryDetailsService service = SupabaseClient.getInstance(context).create(HistoryDetailsService.class);
+
+        service.getMonitor("eq." + sessionId, "eq." + SessionManager.getUserId(context), "snapshot_index.asc").enqueue(new Callback<List<MonitorResponse>>() {
+
+            @Override
+            public void onResponse(@NonNull Call<List<MonitorResponse>> call, @NonNull Response<List<MonitorResponse>> response) {
+
+                if (!isAdded() || getView() == null) return;
+
+                if (response.isSuccessful() && response.body() != null) {
+                    snapshotList.clear();
+                    snapshotList.addAll(response.body());
+                    drawChart();
+                    updateCards();
+
+                    currentSnapshotIndex = 0;
+
+                    if(!snapshotList.isEmpty()){
+                        showHeatmap(0);
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<MonitorResponse>> call, @NonNull Throwable t) {
+                Log.e(TAG, "Snapshot error", t);
+            }
+        });
+    }
+
     private void drawChart() {
+        if (!isAdded()) return;
+
+        if (barChart == null) return;
+
+        if (snapshotList.isEmpty()) {
+            barChart.clear();
+            return;
+        }
 
         List<BarEntry> entries = new ArrayList<>();
         List<String> labels = new ArrayList<>();
@@ -155,6 +276,11 @@ public class HistoryDetailsFragment extends Fragment {
             if (total > maxTotal) maxTotal = total;
         }
 
+        if (maxTotal == 0) {
+            barChart.clear();
+            return;
+        }
+
         if (maxTotal < 6) maxTotal = 6;
 
         BarDataSet ds = new BarDataSet(entries, "");
@@ -163,6 +289,7 @@ public class HistoryDetailsFragment extends Fragment {
                 Color.parseColor("#D97706"),
                 Color.parseColor("#059669")
         );
+        ds.setStackLabels(new String[]{"Low", "Med", "High"});
 
         BarData data = new BarData(ds);
         data.setBarWidth(0.5f);
@@ -191,8 +318,14 @@ public class HistoryDetailsFragment extends Fragment {
     }
 
     private void updateCards() {
+        if (!isAdded()) return;
 
-        if (snapshotList.isEmpty()) return;
+        if (snapshotList.isEmpty()) {
+            tvTotalStudents.setText("-");
+            tvDominant.setText("-");
+            tvDominant.setTextColor(Color.GRAY);
+            return;
+        }
 
         int totalStudents = 0;
         float totalScore = 0;
@@ -227,25 +360,19 @@ public class HistoryDetailsFragment extends Fragment {
             tvDominant.setText("LOW");
             tvDominant.setTextColor(Color.parseColor("#DC2626"));
         }
-
-        Log.d(TAG, "Avg Students: " + avgStudents);
-        Log.d(TAG, "Avg Score: " + avgScore);
     }
 
     private void loadStudentEvolution() {
+        Context context = getContext();
+        if (context == null) return;
 
-        StudentService service = SupabaseClient.getInstance(requireContext())
-                .create(StudentService.class);
+        HistoryDetailsService service = SupabaseClient.getInstance(context)
+                .create(HistoryDetailsService.class);
 
-        service.getStudentEvolution(
-                "*",
-                "eq." + sessionId,
-                "student_id.asc,snapshot_index.asc"
-        ).enqueue(new Callback<List<StudentResponse>>() {
-
+        service.getStudentEvolution("*", "eq." + sessionId, "student_id.asc,snapshot_index.asc").enqueue(new Callback<List<StudentResponse>>() {
             @Override
-            public void onResponse(Call<List<StudentResponse>> call,
-                                   Response<List<StudentResponse>> response) {
+            public void onResponse(@NonNull Call<List<StudentResponse>> call, @NonNull Response<List<StudentResponse>> response) {
+                if (!isAdded() || getView() == null) return;
 
                 if (response.isSuccessful() && response.body() != null) {
                     renderStudents(response.body());
@@ -253,13 +380,15 @@ public class HistoryDetailsFragment extends Fragment {
             }
 
             @Override
-            public void onFailure(Call<List<StudentResponse>> call, Throwable t) {
+            public void onFailure(@NonNull Call<List<StudentResponse>> call, @NonNull Throwable t) {
                 Log.e(TAG, "Student error", t);
             }
         });
     }
 
     private void renderStudents(List<StudentResponse> list) {
+        Context context = getContext();
+        if (context == null) return;
 
         containerStudents.removeAllViews();
 
@@ -271,37 +400,36 @@ public class HistoryDetailsFragment extends Fragment {
 
         for (List<StudentResponse> snapshots : map.values()) {
 
-            View item = LayoutInflater.from(getContext())
-                    .inflate(R.layout.student_item, containerStudents, false);
+            if (snapshots.isEmpty()) continue;
 
-            TextView tvId = item.findViewById(R.id.tvId);
-            LinearLayout flow = item.findViewById(R.id.containerFlow);
+            View item = LayoutInflater.from(context).inflate(R.layout.item_history_details, containerStudents, false);
+
+            TextView tvId = item.findViewById(R.id.tvStudentId);
+            LinearLayout flow = item.findViewById(R.id.containerAttention);
 
             tvId.setText("Student " + snapshots.get(0).getLocalId());
 
             for (int i = 0; i < snapshots.size(); i++) {
 
-                TextView badge = new TextView(getContext());
+                TextView badge = new TextView(context);
                 badge.setPadding(20, 10, 20, 10);
-                badge.setText(snapshots.get(i).getAttention().toUpperCase());
+
+                String attention = snapshots.get(i).getAttention();
+                badge.setText(attention != null ? attention.toUpperCase() : "-");
                 badge.setTextColor(Color.WHITE);
 
-                switch (snapshots.get(i).getAttention()) {
-                    case "low":
-                        badge.setBackgroundColor(Color.parseColor("#DC2626"));
-                        break;
-                    case "medium":
-                        badge.setBackgroundColor(Color.parseColor("#D97706"));
-                        break;
-                    case "high":
-                        badge.setBackgroundColor(Color.parseColor("#059669"));
-                        break;
+                if ("low".equals(attention)) {
+                    badge.setBackgroundColor(Color.parseColor("#DC2626"));
+                } else if ("medium".equals(attention)) {
+                    badge.setBackgroundColor(Color.parseColor("#D97706"));
+                } else if ("high".equals(attention)) {
+                    badge.setBackgroundColor(Color.parseColor("#059669"));
                 }
 
                 flow.addView(badge);
 
                 if (i < snapshots.size() - 1) {
-                    TextView arrow = new TextView(getContext());
+                    TextView arrow = new TextView(context);
                     arrow.setText(" → ");
                     flow.addView(arrow);
                 }
@@ -320,25 +448,5 @@ public class HistoryDetailsFragment extends Fragment {
 
     private float roundUp(int value, int step) {
         return ((value + step - 1) / step) * step;
-    }
-
-    private String formatTime(String dateStr) {
-        try {
-            SimpleDateFormat inputFormat =
-                    new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ENGLISH);
-            inputFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-            Date date = inputFormat.parse(dateStr);
-
-            SimpleDateFormat outputFormat =
-                    new SimpleDateFormat("dd MMM • HH:mm", Locale.getDefault());
-            outputFormat.setTimeZone(TimeZone.getTimeZone("Europe/Bucharest"));
-
-            return outputFormat.format(date);
-
-        } catch (Exception e) {
-            Log.e(TAG, "Date parse error", e);
-            return dateStr;
-        }
     }
 }

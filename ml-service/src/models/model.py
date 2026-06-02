@@ -1,10 +1,12 @@
 import numpy as np
+
 from tensorflow.keras import layers
 from tensorflow.keras.models import Model
 
 from src.config.settings import ENGAGEMENT_MODEL_PATH, ENGAGEMENT_LABEL_MAP
 
-def build_model(input_dim=1434, sequence_length=20, dropout=0.5):
+
+def build_model(input_dim: int = 1434, sequence_length: int = 20, dropout: float = 0.5) -> Model:
     inputs = layers.Input(shape=(sequence_length, input_dim), name='inputs')
 
     x = layers.LSTM(256, return_sequences=True)(inputs)
@@ -15,16 +17,16 @@ def build_model(input_dim=1434, sequence_length=20, dropout=0.5):
     x = layers.Dense(128, activation='relu')(x)
     x = layers.Dense(64, activation='relu')(x)
 
-    output = layers.Dense(4, activation='softmax', name="engagenet_output", dtype="float32")(x)
+    output = layers.Dense(3, activation='softmax', name="att_output")(x)
 
-    model = Model(inputs=inputs, outputs=output, name="EngageNet")
+    model = Model(inputs=inputs, outputs=output, name="Dipseer")
 
     model.load_weights(ENGAGEMENT_MODEL_PATH)
 
     return model
 
 
-def predict_student_states(model, student_sequences):
+def predict_states(model: Model, student_sequences: dict) -> dict:
     predictions = {}
 
     for student_id, sequence in student_sequences.items():
